@@ -90,7 +90,13 @@ class Axis:
     def move(self, distance, speed=0.001):
         #distance in meters!
         #speed in meters/second
-        #print "Moving: ", distance/self.pitch, " revolutions"
+        if speed<0.0:
+          speed=-speed
+          distance=-distance
+        if speed==0.0:
+          distance=0.0
+          speed=0.001
+        print "Moving: ", distance/self.pitch, " revolutions"
         self.stepper.move_angle(360.0*distance/self.pitch, speed/self.pitch)
 
 class Stepper:
@@ -143,7 +149,7 @@ class Stepper:
     def move_steps(self, steps, speed):
         #speed in steps per second
         period=1.0/speed
-        print "Speed: ", speed, " period: ", period
+        print "Steps: ", steps, " Speed: ", speed, " period: ", period
         if self._enable:
             if steps<0:
             #    print "Pos dir"
@@ -178,6 +184,8 @@ if __name__=="__main__":
   moty=Stepper(14, 15, 18)
   axisx=Axis(motx)
   axisy=Axis(moty)
+  axisx.enable()
+  axisy.enable()
 
   while True:
     input_bottle=input_port.read(False)
@@ -185,11 +193,13 @@ if __name__=="__main__":
       input_data=input_bottle.get(0).asString()
       print "Input data: ", input_data
       data=input_data.split(" ")
+      print "Data: ", data
       if data[0]=="speed":
-        print "Speed command"
-        
+        print "Speed command: ", float(data[1]), float(data[2])
+        axisx.move(0.01, speed=float(data[1]))
+        axisy.move(0.01, speed=float(data[2]))
     else:
-      yarp.Time.delay(0.001)
+      yarp.Time.delay(0.1)
 
-  circle1=Circle(axisx, axisy)
-  circle1.do_circle(0.01, cut_speed=0.0005, move_speed=0.05)
+  #circle1=Circle(axisx, axisy)
+  #circle1.do_circle(0.01, cut_speed=0.0005, move_speed=0.05)

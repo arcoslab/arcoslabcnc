@@ -5,8 +5,8 @@ import sys
 
 output_port_name="/jogging/cmd:o"
 server_input_port_name="/cnc/cmd:i"
-scale_factor=0.01 # 0.01m/s (1cm/s) max speed
-dead_band=0.3 # dead band between -0.3 and 0.3
+scale_factor=0.05 # 0.01m/s (1cm/s) max speed
+dead_band=0.1 # dead band between -0.3 and 0.3
 
 pygame.init()
 pygame.joystick.init()
@@ -22,13 +22,21 @@ import yarp
 yarp.Network.init()
 output_port=yarp.BufferedPortBottle()
 output_port.open(output_port_name)
-yarp.Network.connect(output_port_name, server_input_port_name)
+style=yarp.ContactStyle()
+style.persistent=True
+yarp.Network.connect(output_port_name, server_input_port_name, style )
 
 max_val=[1.0, 1.0]
 min_val=[-1.0, -1.0]
 
+def quad_scale(data):
+    if data<0:
+        return(-data**4)
+    else:
+        return(data**4)
+
 def joy_to_distance(data):
-    return(data*scale_factor)
+    return(quad_scale(data)*scale_factor)
 
 def dead_band_transform(data):
     if (data > dead_band):
@@ -66,42 +74,6 @@ active=True
 speed=[0.0,0.0]
 while not finish:
     pygame.event.get()
-    #for event in pygame.event.get():
-         #print "Event: ", event
-    #     if (event.type == pygame.JOYBUTTONDOWN) or (event.type == pygame.JOYBUTTONUP):
-    #         print "Button pressed/released: ", event.button
-    #         print "Button value: ", event.button, js.get_button(event.button)
-    #         if event.type == pygame.JOYBUTTONDOWN:
-    #             print "Active control"
-    #             active=True
-    #         else:
-    #             print "Deactivating control"
-    #             active=False
-    #     if event.type == pygame.JOYAXISMOTION:
-    #         if (event.axis==1) or (event.axis==2) :
-    #             #print "Axis changed: ", event.axis
-    #             print "Axis value: ", event.value, js.get_axis(event.axis)
-    #             #print "Updating speed value"
-    #             if event.axis==1:
-    #                 if event.value>0:
-    #                     if event.value>max_val[0]:
-    #                         print "Increasing max_val for X", event.value
-    #                         max_val[0]=event.value
-    #                 else:
-    #                     if event.value<min_val[0]:
-    #                         print "Decreasing min_val for X", event.value
-    #                         min_val[0]=event.value
-    #                 speed[1]=joy_to_distance(dead_band_transform(scale_cal(event.value, 0)))
-    #             else:
-    #                 if event.value>0:
-    #                     if event.value>max_val[1]:
-    #                         print "Increasing max_val for Y", event.value
-    #                         max_val[1]=event.value
-    #                 else:
-    #                     if event.value<min_val[1]:
-    #                         print "Decreasing min_val for Y", event.value
-    #                         min_val[1]=event.value
-    #                 speed[0]=joy_to_distance(dead_band_transform(scale_cal(event.value, 1)))
     button_value=js.get_button(11)
     if button_value==0:
         active=False
