@@ -62,45 +62,77 @@ def scale_cal(data, axis):
         return(0.0)
 
 finish=False
-active=False
+active=True
 speed=[0.0,0.0]
 while not finish:
-    for event in pygame.event.get():
-        #print "Event: ", event
-        if (event.type == pygame.JOYBUTTONDOWN) or (event.type == pygame.JOYBUTTONUP):
-            print "Button pressed/released: ", event.button
-            print "Button value: ", event.button, js.get_button(event.button)
-            if event.type == pygame.JOYBUTTONDOWN:
-                print "Active control"
-                active=True
-            else:
-                print "Deactivating control"
-                active=False
-        if event.type == pygame.JOYAXISMOTION:
-            if (event.axis==1) or (event.axis==2) :
-                #print "Axis changed: ", event.axis
-                print "Axis value: ", event.value, js.get_axis(event.axis)
+    pygame.event.get()
+    #for event in pygame.event.get():
+         #print "Event: ", event
+    #     if (event.type == pygame.JOYBUTTONDOWN) or (event.type == pygame.JOYBUTTONUP):
+    #         print "Button pressed/released: ", event.button
+    #         print "Button value: ", event.button, js.get_button(event.button)
+    #         if event.type == pygame.JOYBUTTONDOWN:
+    #             print "Active control"
+    #             active=True
+    #         else:
+    #             print "Deactivating control"
+    #             active=False
+    #     if event.type == pygame.JOYAXISMOTION:
+    #         if (event.axis==1) or (event.axis==2) :
+    #             #print "Axis changed: ", event.axis
+    #             print "Axis value: ", event.value, js.get_axis(event.axis)
+    #             #print "Updating speed value"
+    #             if event.axis==1:
+    #                 if event.value>0:
+    #                     if event.value>max_val[0]:
+    #                         print "Increasing max_val for X", event.value
+    #                         max_val[0]=event.value
+    #                 else:
+    #                     if event.value<min_val[0]:
+    #                         print "Decreasing min_val for X", event.value
+    #                         min_val[0]=event.value
+    #                 speed[1]=joy_to_distance(dead_band_transform(scale_cal(event.value, 0)))
+    #             else:
+    #                 if event.value>0:
+    #                     if event.value>max_val[1]:
+    #                         print "Increasing max_val for Y", event.value
+    #                         max_val[1]=event.value
+    #                 else:
+    #                     if event.value<min_val[1]:
+    #                         print "Decreasing min_val for Y", event.value
+    #                         min_val[1]=event.value
+    #                 speed[0]=joy_to_distance(dead_band_transform(scale_cal(event.value, 1)))
+    button_value=js.get_button(11)
+    if button_value==0:
+        active=False
+    else:
+        active=True
+
+    for axis in [1,2]:
+        value=js.get_axis(axis)
                 #print "Updating speed value"
-                if event.axis==1:
-                    if event.value>0:
-                        if event.value>max_val[0]:
-                            print "Increasing max_val for X", event.value
-                            max_val[0]=event.value
-                    else:
-                        if event.value<min_val[0]:
-                            print "Decreasing min_val for X", event.value
-                            min_val[0]=event.value
-                    speed[1]=joy_to_distance(dead_band_transform(scale_cal(event.value, 0)))
-                else:
-                    if event.value>0:
-                        if event.value>max_val[1]:
-                            print "Increasing max_val for Y", event.value
-                            max_val[1]=event.value
-                    else:
-                        if event.value<min_val[1]:
-                            print "Decreasing min_val for Y", event.value
-                            min_val[1]=event.value
-                    speed[0]=joy_to_distance(dead_band_transform(scale_cal(event.value, 1)))
+        if axis==1:
+            if value>0:
+                if value>max_val[0]:
+                    print "Increasing max_val for X", value
+                    max_val[0]=value
+            else:
+                if value<min_val[0]:
+                    print "Decreasing min_val for X", value
+                    min_val[0]=value
+            speed[1]=joy_to_distance(dead_band_transform(scale_cal(value, 0)))
+        else:
+            if value>0:
+                if value>max_val[1]:
+                    print "Increasing max_val for Y", value
+                    max_val[1]=value
+            else:
+                if value<min_val[1]:
+                    print "Decreasing min_val for Y", value
+                    min_val[1]=value
+            speed[0]=joy_to_distance(dead_band_transform(scale_cal(value, 1)))
+
+
     if not active:
         speed=[0.0,0.0]
     #print "Sending control command: ", speed
@@ -108,7 +140,7 @@ while not finish:
     output_bottle.clear()
     output_bottle.addString("speed "+str(speed[0])+" "+str(speed[1])) #speed in meters per second
     output_port.write()
-    yarp.Time.delay(0.001)
+    yarp.Time.delay(0.01)
 
 
 
