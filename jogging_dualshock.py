@@ -24,6 +24,9 @@ output_port=yarp.BufferedPortBottle()
 output_port.open(output_port_name)
 yarp.Network.connect(output_port_name, server_input_port_name)
 
+max_val=[1.0, 1.0]
+min_val=[-1.0, -1.0]
+
 def joy_to_distance(data):
     return(data*scale_factor)
 
@@ -50,26 +53,62 @@ def sat(data):
     else:
         return(data)
 
+def scale_cal(data, axis):
+    if data<0.0:
+        return(data/-min_val[axis])
+    elif data>0.0:
+        return(data/max_val[axis])
+    else:
+        return(0.0)
+
 finish=False
+active=False
+speed=[0.0,0.0]
 while not finish:
     for event in pygame.event.get():
         #print "Event: ", event
         if (event.type == pygame.JOYBUTTONDOWN) or (event.type == pygame.JOYBUTTONUP):
             print "Button pressed/released: ", event.button
             print "Button value: ", event.button, js.get_button(event.button)
+            if event.type == pygame.JOYBUTTONDOWN:
+                print "Active control"
+                active=True
+            else:
+                print "Deactivating control"
+                active=False
         if event.type == pygame.JOYAXISMOTION:
             if (event.axis==1) or (event.axis==2) :
-                print "Axis changed: ", event.axis
+                #print "Axis changed: ", event.axis
                 print "Axis value: ", event.value, js.get_axis(event.axis)
-                print "Sending value with yarp"
-                output_bottle=output_port.prepare()
-                output_bottle.clear()
+                #print "Updating speed value"
                 if event.axis==1:
-                    axis="Y"
+                    if event.value>0:
+                        if event.value>max_val[0]:
+                            print "Increasing max_val for X", event.value
+                            max_val[0]=event.value
+                    else:
+                        if event.value<min_val[0]:
+                            print "Decreasing min_val for X", event.value
+                            min_val[0]=event.value
+                    speed[1]=joy_to_distance(dead_band_transform(scale_cal(event.value, 0)))
                 else:
-                    axis="X"
-                output_bottle.addString("speed "+axis+str(joy_to_distance(dead_band_transform(sat(event.value))))) #speed in meters per second
-                output_port.write()
+                    if event.value>0:
+                        if event.value>max_val[1]:
+                            print "Increasing max_val for Y", event.value
+                            max_val[1]=event.value
+                    else:
+                        if event.value<min_val[1]:
+                            print "Decreasing min_val for Y", event.value
+                            min_val[1]=event.value
+                    speed[0]=joy_to_distance(dead_band_transform(scale_cal(event.value, 1)))
+    if not active:
+        speed=[0.0,0.0]
+    #print "Sending control command: ", speed
+    output_bottle=output_port.prepare()
+    output_bottle.clear()
+    output_bottle.addString("speed "+str(speed[0])+" "+str(speed[1])) #speed in meters per second
+    output_port.write()
+    yarp.Time.delay(0.001)
 
 
 

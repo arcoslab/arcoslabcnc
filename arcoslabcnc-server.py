@@ -173,17 +173,23 @@ if __name__=="__main__":
   yarp.Network.init()
   input_port=yarp.BufferedPortBottle()
   input_port.open(input_port_name)
-  while True:
-    input_bottle=input_port.read(False)
-    if input_bottle:
-      input_data=input_bottle.get(0).asString()
-      print "Input data: ", input_data
-    else:
-      yarp.Time.delay(0.001)
 
   motx=Stepper(25, 8, 7)
   moty=Stepper(14, 15, 18)
   axisx=Axis(motx)
   axisy=Axis(moty)
+
+  while True:
+    input_bottle=input_port.read(False)
+    if input_bottle:
+      input_data=input_bottle.get(0).asString()
+      print "Input data: ", input_data
+      data=input_data.split(" ")
+      if data[0]=="speed":
+        print "Speed command"
+        
+    else:
+      yarp.Time.delay(0.001)
+
   circle1=Circle(axisx, axisy)
   circle1.do_circle(0.01, cut_speed=0.0005, move_speed=0.05)
