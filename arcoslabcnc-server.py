@@ -5,6 +5,9 @@ from gpiozero import DigitalOutputDevice as pwm
 from time import sleep
 from math import pi, atan, sin, cos
 
+input_port_name="/cnc/cmd:i"
+
+
 def frange(x, y, jump):
   while x < y:
     yield x
@@ -45,7 +48,7 @@ class Circle:
                 raw_input()
                 iteration=2
                 speed=cut_speed
-            
+
             #print "Angle: ", angle, "X, Y: ", x, y, x-old_x, y-old_y
             #raw_input()
             self.axisx.move(x-old_x, speed)
@@ -166,9 +169,21 @@ class Stepper:
 
 
 if __name__=="__main__":
-    motx=Stepper(25, 8, 7)
-    moty=Stepper(14, 15, 18)
-    axisx=Axis(motx)
-    axisy=Axis(moty)
-    circle1=Circle(axisx, axisy)
-    circle1.do_circle(0.01, cut_speed=0.0005, move_speed=0.05)
+  import yarp
+  yarp.Network.init()
+  input_port=yarp.BufferedPortBottle()
+  input_port.open(input_port_name)
+  while True:
+    input_bottle=input_port.read(False)
+    if input_bottle:
+      input_data=input_bottle.get(0).asString()
+      print "Input data: ", input_data
+    else:
+      yarp.Time.delay(0.001)
+
+  motx=Stepper(25, 8, 7)
+  moty=Stepper(14, 15, 18)
+  axisx=Axis(motx)
+  axisy=Axis(moty)
+  circle1=Circle(axisx, axisy)
+  circle1.do_circle(0.01, cut_speed=0.0005, move_speed=0.05)
