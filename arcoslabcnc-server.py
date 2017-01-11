@@ -255,13 +255,16 @@ if __name__=="__main__":
     input_bottle=input_port.read(False)
     if input_bottle:
       input_data=input_bottle.get(0).asString()
-      #print "Input data: ", input_data
+      print "Input data: ", input_data
       data=input_data.split(" ")
       #print "Data: ", data
       if data[0]=="speed":
         #print "Speed command: ", float(data[1]), float(data[2])
         axisx.move(0.01, speed=float(data[1]))
         axisy.move(0.01, speed=float(data[2]))
+      elif data[0]=="move":
+        axisx.move(float(data[1]), speed=float(data[3]))
+        axisy.move(float(data[2]), speed=float(data[3]))
     motx.update()
     moty.update()
     yarp.Time.delay(0.0001)
