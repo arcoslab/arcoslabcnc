@@ -4,74 +4,10 @@ from gpiozero import DigitalOutputDevice as dig
 from gpiozero import DigitalOutputDevice as pwm
 from time import sleep
 import time
-from math import pi, atan, sin, cos
 from multiprocessing import Process, Queue
 input_port_name="/cnc/cmd:i"
 status_port_name="/cnc/status:o"
 
-def frange(x, y, jump):
-  while x < y:
-    yield x
-    x += jump
-
-class Circle:
-    def __init__(self, axisx, axisy):
-        self.axisx=axisx
-        self.axisy=axisy
-        self.step_x=self.axisx.stepper.step
-        self.step_y=self.axisy.stepper.step
-        self.pitch_x=self.axisx.pitch
-        self.pitch_y=self.axisy.pitch
-        self.res_x=(self.step_x/360.)*self.pitch_x
-        self.res_y=(self.step_y/360.)*self.pitch_y
-        self.move_speed=0.05
-        self.cut_speed=0.03
-
-    def do_circle(self, radius, cut_speed=0.03, move_speed=0.05):
-        self.axisx.enable()
-        self.axisy.enable()
-        step_angle=atan(self.res_x/radius)*360.0/(2.*pi)
-        print "Step angle: ", step_angle
-        old_x=0.0
-        old_y=0.0
-        iteration=0
-        for angle in frange(0., 360.0, step_angle):
-            x=radius*cos(angle*(2*pi)/360.0)
-            y=radius*sin(angle*(2*pi)/360.0)
-            if iteration==0:
-                print "Position piece in circle center"
-                print "Moving to first circle position, pull bit up!"
-                raw_input()
-                iteration=1
-                speed=move_speed
-            elif iteration==1:
-                print "Start mill position, pull bit down at desired height!"
-                raw_input()
-                iteration=2
-                speed=cut_speed
-
-            #print "Angle: ", angle, "X, Y: ", x, y, x-old_x, y-old_y
-            #raw_input()
-            self.axisx.move(x-old_x, speed)
-            self.axisy.move(y-old_y, speed)
-            while self.axisx.is_moving():
-                print "Waiting for X"
-                sleep(0.001)
-                pass
-            while self.axisy.is_moving():
-                print "Waiting for Y"
-                sleep(0.001)
-                pass
-            old_x=x
-            old_y=y
-        print "Pull bit up!, moving fast to center"
-        raw_input()
-        speed=move_speed
-        self.axisx.move(-radius, speed)
-        while self.axisx.is_moving():
-            print "Waiting for X"
-            sleep(0.001)
-            pass
 
 class Axis:
     def __init__(self, stepper, pitch=0.005):
@@ -282,6 +218,12 @@ if __name__=="__main__":
         status_bottle.clear()
         status_bottle.addInt(int(busy))
         status_port.write()
+      elif data[0]=="up":
+        print "Pull drill up"
+        raw_input()
+      elif data[0]=="down":
+        print "Pull drill down"
+        raw_input()
     motx.update()
     moty.update()
     yarp.Time.delay(0.0001)
