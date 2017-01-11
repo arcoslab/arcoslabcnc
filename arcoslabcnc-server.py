@@ -7,7 +7,7 @@ import time
 from math import pi, atan, sin, cos
 from multiprocessing import Process, Queue
 input_port_name="/cnc/cmd:i"
-
+status_port_name="/cnc/status:o"
 
 def frange(x, y, jump):
   while x < y:
@@ -227,6 +227,12 @@ class Stepper:
                 self.pulse.on()
                 self.state=True
 
+    def isBusy(self):
+      if self.steps==0:
+        return(False)
+      else:
+        return(True)
+
     def toggle(self, n=1):
         for i in xrange(n):
             self.pulse.on()
@@ -243,6 +249,8 @@ if __name__=="__main__":
   yarp.Network.init()
   input_port=yarp.BufferedPortBottle()
   input_port.open(input_port_name)
+  status_port=yarp.BufferedPortBottle()
+  status_port.open(status_port_name)
 
   motx=Stepper(25, 8, 7)
   moty=Stepper(14, 15, 18)
@@ -263,8 +271,17 @@ if __name__=="__main__":
         axisx.move(0.01, speed=float(data[1]))
         axisy.move(0.01, speed=float(data[2]))
       elif data[0]=="move":
-        axisx.move(float(data[1]), speed=float(data[3]))
-        axisy.move(float(data[2]), speed=float(data[3]))
+        if (not motx.isBusy()) and (not moty.isBusy()):
+          axisx.move(float(data[1]), speed=float(data[3]))
+          axisy.move(float(data[2]), speed=float(data[3]))
+        else:
+          print "Still executing previous command, ignoring new command"
+      elif data[0]=="status":
+        busy=motx.isBusy() or moty.isBusy()
+        status_bottle=status_port.prepare()
+        status_bottle.clear()
+        status_bottle.addInt(int(busy))
+        status_port.write()
     motx.update()
     moty.update()
     yarp.Time.delay(0.0001)
