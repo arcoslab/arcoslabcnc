@@ -1,8 +1,8 @@
 #!/usr/bin/python
-
+#usage: ./circle.py <radius> <turns>
 from math import pi, atan, sin, cos
 import sys
-motor_step=(0.9, 0.9) #degrees
+motor_step=(10.9, 10.9) #degrees
 screw_pitch=(0.005, 0.005) #meters
 
 def frange(x, y, jump):
@@ -21,33 +21,35 @@ class Circle:
         self.move_speed=0.05
         self.cut_speed=0.03
 
-    def do_circle(self, radius, cut_speed=0.03, move_speed=0.05):
+    def do_circle(self, radius, cut_speed=0.03, move_speed=0.05, turns=1):
         cmds=[]
         step_angle=atan(self.res_x/radius)*360.0/(2.*pi)
         print "Step angle: ", step_angle
         old_x=0.0
         old_y=0.0
         iteration=0
-        for angle in frange(0., 360.0, step_angle):
-            x=radius*cos(angle*(2*pi)/360.0)
-            y=radius*sin(angle*(2*pi)/360.0)
-            if iteration==0:
-                print "Position piece in circle center"
-                print "Moving to first circle position, pull bit up!"
-                cmds.append("up")
-                iteration=1
-                speed=move_speed
-            elif iteration==1:
-                print "Start mill position, pull bit down at desired height!"
-                cmds.append("down")
-                iteration=2
-                speed=cut_speed
+        for i in xrange(turns):
+            for angle in frange(0., 360.0, step_angle):
+                x=radius*cos(angle*(2*pi)/360.0)
+                y=radius*sin(angle*(2*pi)/360.0)
+                if iteration==0:
+                    print "Position piece in circle center"
+                    print "Moving to first circle position, pull bit up!"
+                    cmds.append("up")
+                    iteration=1
+                    speed=move_speed
+                elif iteration==1:
+                    print "Start mill position, pull bit down at desired height!"
+                    cmds.append("down")
+                    iteration=2
+                    speed=cut_speed
 
-            #print "Angle: ", angle, "X, Y: ", x, y, x-old_x, y-old_y
-            #raw_input()
-            cmds.append("move "+str(x-old_x)+" "+str(y-old_y)+" "+str(speed))
-            old_x=x
-            old_y=y
+                #print "Angle: ", angle, "X, Y: ", x, y, x-old_x, y-old_y
+                #raw_input()
+                cmds.append("move "+str(x-old_x)+" "+str(y-old_y)+" "+str(speed))
+                old_x=x
+                old_y=y
+            cmds.append("down")
         print "Pull bit up!, moving fast to center"
         cmds.append("up")
         speed=move_speed
@@ -104,7 +106,7 @@ while busy:
 print "Last command finished"
 
 circle0=Circle(motor_step=motor_step, screw_pitch=screw_pitch)
-cmds=circle0.do_circle(float(sys.argv[1]), cut_speed=0.003, move_speed=0.05)
+cmds=circle0.do_circle(float(sys.argv[1]), cut_speed=0.01, move_speed=0.05, turns=int(sys.argv[2]))
 
 print "Cmds: ", cmds
 print "Num cmds: ", len(cmds)
@@ -141,4 +143,21 @@ for i, cmd in enumerate(cmds):
     output_bottle.addString(cmd)
     output_port.write()
 
+
+busy=True
+while busy:
+    #print "Waiting for last command to finish"
+    output_bottle=output_port.prepare()
+    output_bottle.clear()
+    output_bottle.addString("status")
+    output_port.write()
+    output_port.prepare()
+    status_bottle=status_port.read(False)
+    if status_bottle:
+        status=status_bottle.get(0).asInt()
+        if status==0:
+            busy=False
+        else:
+            busy=True
+    yarp.Time.delay(0.01)
 output_port.close()

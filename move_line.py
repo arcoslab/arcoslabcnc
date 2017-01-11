@@ -1,5 +1,5 @@
 #!/usr/bin/python
-
+#usage: ./move_line.py <x> <y> <speed>
 import sys
 
 print sys.argv
