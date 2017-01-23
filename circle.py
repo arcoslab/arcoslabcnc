@@ -1,9 +1,20 @@
 #!/usr/bin/python
-#usage: ./circle.py <radius> <turns>
+#usage: ./circle.py <centerx> <centery> <radius> <turns> <cut_speed> <angle resolution factor> <in/cm>
 from math import pi, atan, sin, cos
 import sys
-motor_step=(10.9, 10.9) #degrees
+motor_step=(0.225, 0.225) #degrees
 screw_pitch=(0.005, 0.005) #meters
+move_speed=0.005
+
+if sys.argv[7]=="in":
+    system_factor=0.0254
+elif sys.argv[7]=="m":
+    system_factor=1.0
+elif sys.argv[7]=="mm":
+    system_factor=0.001
+else:
+    print "Specify system"
+    sys.exit(-1)
 
 def frange(x, y, jump):
   while x < y:
@@ -18,26 +29,29 @@ class Circle:
         self.pitch_y=screw_pitch[1]
         self.res_x=(self.step_x/360.)*self.pitch_x
         self.res_y=(self.step_y/360.)*self.pitch_y
-        self.move_speed=0.05
-        self.cut_speed=0.03
+        self.move_speed=0.005
+        self.cut_speed=0.0005
 
-    def do_circle(self, radius, cut_speed=0.03, move_speed=0.05, turns=1):
+    def do_circle(self, centerx, centery, radius, cut_speed=0.03, move_speed=0.05, turns=1, angle_res_factor=1.0):
         cmds=[]
-        step_angle=atan(self.res_x/radius)*360.0/(2.*pi)
+        step_angle=angle_res_factor*atan(self.res_x/radius)*360.0/(2.*pi)
         print "Step angle: ", step_angle
         old_x=0.0
         old_y=0.0
         iteration=0
+        print "Positioning piece in circle center"
+        cmds.append("up")
+        speed=cut_speed
+        #cmds.append("move_abs "+str(centerx)+" "+str(centery)+" "+str(speed))
         for i in xrange(turns):
             for angle in frange(0., 360.0, step_angle):
                 x=radius*cos(angle*(2*pi)/360.0)
                 y=radius*sin(angle*(2*pi)/360.0)
                 if iteration==0:
-                    print "Position piece in circle center"
                     print "Moving to first circle position, pull bit up!"
                     cmds.append("up")
                     iteration=1
-                    speed=move_speed
+                    speed=cut_speed
                 elif iteration==1:
                     print "Start mill position, pull bit down at desired height!"
                     cmds.append("down")
@@ -46,14 +60,16 @@ class Circle:
 
                 #print "Angle: ", angle, "X, Y: ", x, y, x-old_x, y-old_y
                 #raw_input()
-                cmds.append("move "+str(x-old_x)+" "+str(y-old_y)+" "+str(speed))
+                #cmds.append("move "+str(x-old_x)+" "+str(y-old_y)+" "+str(speed))
+                cmds.append("move_abs "+str(x+centerx)+" "+str(y+centery)+" "+str(speed))
                 old_x=x
                 old_y=y
-            cmds.append("down")
+            #cmds.append("down")
         print "Pull bit up!, moving fast to center"
         cmds.append("up")
         speed=move_speed
-        cmds.append("move "+str(-radius)+" "+str(0.0)+" "+str(speed))
+        #cmds.append("move "+str(-radius)+" "+str(0.0)+" "+str(speed))
+        #cmds.append("move_abs "+str(centerx)+" "+str(centery)+" "+str(speed))
         return(cmds)
 
 print sys.argv
@@ -106,20 +122,23 @@ while busy:
 print "Last command finished"
 
 circle0=Circle(motor_step=motor_step, screw_pitch=screw_pitch)
-cmds=circle0.do_circle(float(sys.argv[1]), cut_speed=0.01, move_speed=0.05, turns=int(sys.argv[2]))
+cmds=circle0.do_circle(system_factor*float(sys.argv[1]), system_factor*float(sys.argv[2]), system_factor*float(sys.argv[3]), cut_speed=float(sys.argv[5]), move_speed=move_speed, turns=int(sys.argv[4]), angle_res_factor=float(sys.argv[6]))
 
-print "Cmds: ", cmds
+#print "Cmds: ", cmds
 print "Num cmds: ", len(cmds)
-
+old_percentage=0.0
 for i, cmd in enumerate(cmds):
-    print "Current cmd: ", cmd, " cmd progress: ", i, len(cmds), i*100.0/len(cmds), "%"
+    percentage=i*100.0/len(cmds)
+    if percentage>old_percentage+1.0:
+        print "Current cmd: ", cmd, " cmd progress: ", i, len(cmds), i*100.0/len(cmds), "%"
+        old_percentage=percentage
     if cmd=="up":
         print "Pull drill up"
-        raw_input()
+        #raw_input()
         continue
     if cmd=="down":
         print "Pull drill down and adjust drill speed"
-        raw_input()
+        #raw_input()
         continue
     busy=True
     while busy:

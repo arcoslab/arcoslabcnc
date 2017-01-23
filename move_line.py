@@ -1,13 +1,20 @@
 #!/usr/bin/python
-#usage: ./move_line.py <x> <y> <speed>
+#usage: ./move_line.py <x> <y> <speed> <in/mm/m> <abs/rel>
 import sys
 
 print sys.argv
 
-if len(sys.argv)<4:
-    speed=0.002
+if sys.argv[4]=="in":
+    system_factor=0.0254
+elif sys.argv[4]=="m":
+    system_factor=1.0
+elif sys.argv[4]=="mm":
+    system_factor=0.001
 else:
-    speed=float(sys.argv[3])
+    print "Specify system"
+    sys.exit(-1)
+
+speed=float(sys.argv[3])
 
 output_port_name="/move_line/cmd:o"
 status_port_name="/move_line/status:i"
@@ -55,7 +62,11 @@ print "Last command finished"
 
 output_bottle=output_port.prepare()
 output_bottle.clear()
-output_bottle.addString("move "+sys.argv[1]+" "+sys.argv[2]+" "+str(speed)) #speed in meters per second
+if sys.argv[5]=="abs":
+    output_bottle.addString("move_abs "+str(system_factor*float(sys.argv[1]))+" "+str(system_factor*float(sys.argv[2]))+" "+str(speed)) #speed in meters per second
+else:
+    output_bottle.addString("move "+str(system_factor*float(sys.argv[1]))+" "+str(system_factor*float(sys.argv[2]))+" "+str(speed)) #speed in meters per second
+
 output_port.write()
 output_port.prepare()
 while output_port.isWriting():

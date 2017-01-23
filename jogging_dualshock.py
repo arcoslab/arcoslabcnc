@@ -112,7 +112,7 @@ while not finish:
     output_bottle.clear()
     output_bottle.addString("speed "+str(speed[0])+" "+str(speed[1])) #speed in meters per second
     output_port.write()
-    yarp.Time.delay(0.01)
+    yarp.Time.delay(0.001)
 
 
 

@@ -7,6 +7,7 @@ import time
 from multiprocessing import Process, Queue
 input_port_name="/cnc/cmd:i"
 status_port_name="/cnc/status:o"
+pos_port_name="/cnc/pos:o"
 
 
 class Axis:
@@ -35,6 +36,12 @@ class Axis:
           speed=0.001
         #print "Moving: ", distance/self.pitch, " revolutions"
         self.stepper.move_angle(360.0*distance/self.pitch, speed/self.pitch)
+
+    def move_abs(self, pos, speed=0.001):
+        self.move(pos-self.cur_pos, speed)
+
+    def update(self):
+        self.cur_pos=(self.stepper.cur_angle/360.0)*self.pitch
 
 class PreciseSpeed:
   def __init__(self, pin):
@@ -94,6 +101,14 @@ class Stepper:
         self.time_last_toggle=self.time
         self.state=False
         self.steps=0
+        self.cur_angle=0.0
+        self.cur_steps=0
+        self.cur_dir=False
+
+    def reset_pos(self):
+        self.cur_angle=0.0
+        self.cur_steps=0
+        self.step_rest=0.0
 
     def enable(self):
         self._enable=True
@@ -108,6 +123,11 @@ class Stepper:
         self.direction.off()
         #self.pulse.off()
 
+    def stop(self):
+        self.disable()
+        self.steps=0
+        self.step_rest=0.0
+
     def move_angle(self, delta_angle, rps):
         #angle in degrees
         #rps rev per second
@@ -115,9 +135,12 @@ class Stepper:
         total_steps=self.step_rest+delta_angle/self.step
         step_rest=total_steps-float(int(total_steps))
         #print "Total steps: ", total_steps, " step rest: ", step_rest
-        if step_rest>=0.5:
+        if abs(step_rest)>=0.5:
             #print "Stepping one more!"
-            steps=int(total_steps)+1
+            if step_rest>0:
+                steps=int(total_steps)+1
+            else:
+                steps=int(total_steps)-1
         else:
             #print "Stepping truncated"
             steps=int(total_steps)
@@ -134,9 +157,11 @@ class Stepper:
             if steps<0:
             #    print "Pos dir"
                 self.direction.on()
+                self.cur_dir=True
             else:
             #    print "Neg dir"
                 self.direction.off()
+                self.cur_dir=False
             #sleep(self.dir_wait)
             #print "Pulsing"
             #self.pulse.blink(on_time=period/2.0, off_time=period/2.0, n=abs(steps), background=True)
@@ -162,6 +187,11 @@ class Stepper:
               else:
                 self.pulse.on()
                 self.state=True
+                if self.cur_dir:
+                  self.cur_steps-=1
+                else:
+                  self.cur_steps+=1
+                self.cur_angle=self.cur_steps*self.step
 
     def isBusy(self):
       if self.steps==0:
@@ -187,9 +217,12 @@ if __name__=="__main__":
   input_port.open(input_port_name)
   status_port=yarp.BufferedPortBottle()
   status_port.open(status_port_name)
+  pos_port=yarp.BufferedPortBottle()
+  pos_port.open(pos_port_name)
 
-  motx=Stepper(25, 8, 7)
-  moty=Stepper(14, 15, 18)
+  motx=Stepper(2, 3, 4, step=0.225)
+  moty=Stepper(17, 27, 22, step=0.225)
+  #motz=Stepper(10, 9, 11)
   axisx=Axis(motx)
   axisy=Axis(moty)
   axisx.enable()
@@ -199,7 +232,7 @@ if __name__=="__main__":
     input_bottle=input_port.read(False)
     if input_bottle:
       input_data=input_bottle.get(0).asString()
-      print "Input data: ", input_data
+      #print "Input data: ", input_data
       data=input_data.split(" ")
       #print "Data: ", data
       if data[0]=="speed":
@@ -212,21 +245,50 @@ if __name__=="__main__":
           axisy.move(float(data[2]), speed=float(data[3]))
         else:
           print "Still executing previous command, ignoring new command"
+      elif data[0]=="move_abs":
+        if (not motx.isBusy()) and (not moty.isBusy()):
+          axisx.move_abs(float(data[1]), speed=float(data[3]))
+          axisy.move_abs(float(data[2]), speed=float(data[3]))
+        else:
+          print "Still executing previous command, ignoring new command"
       elif data[0]=="status":
         busy=motx.isBusy() or moty.isBusy()
         status_bottle=status_port.prepare()
         status_bottle.clear()
         status_bottle.addInt(int(busy))
         status_port.write()
+      elif data[0]=="stop":
+        print "stop"
+        motx.stop()
+        moty.stop()
+      elif data[0]=="enable":
+        print "Enable"
+        motx.enable()
+        moty.enable()
       elif data[0]=="up":
         print "Pull drill up"
         raw_input()
       elif data[0]=="down":
         print "Pull drill down"
         raw_input()
+      elif data[0]=="cur_pos":
+        print "Current Position"
+        pos_bottle=pos_port.prepare()
+        pos_bottle.clear()
+        pos_bottle.addDouble(axisx.cur_pos)
+        pos_bottle.addDouble(axisy.cur_pos)
+        pos_bottle.addDouble(axisx.cur_pos/0.0254)
+        pos_bottle.addDouble(axisy.cur_pos/0.0254)
+        pos_port.write()
+      elif data[0]=="reset_pos":
+        print "Resetting position!"
+        motx.reset_pos()
+        moty.reset_pos()
     motx.update()
     moty.update()
-    yarp.Time.delay(0.0001)
+    axisx.update()
+    axisy.update()
+    yarp.Time.delay(0.00001)
 
   #circle1=Circle(axisx, axisy)
   #circle1.do_circle(0.01, cut_speed=0.0005, move_speed=0.05)
