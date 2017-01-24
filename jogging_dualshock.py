@@ -26,8 +26,8 @@ style=yarp.ContactStyle()
 style.persistent=True
 yarp.Network.connect(output_port_name, server_input_port_name, style )
 
-max_val=[1.0, 1.0]
-min_val=[-1.0, -1.0]
+max_val=[1.0, 1.0, 1.0]
+min_val=[-1.0, -1.0, -1.0]
 
 def quad_scale(data):
     if data<0:
@@ -40,15 +40,15 @@ def joy_to_distance(data):
 
 def dead_band_transform(data):
     if (data > dead_band):
-        print "up side"
+        #print "up side"
         out=(data-dead_band)/(1.0-dead_band)
     elif (data < -dead_band):
-        print "down side"
+        #print "down side"
         out=(data+dead_band)/(1.0-dead_band)
     else:
-        print "Dead band"
+        #print "Dead band"
         out=0.0
-    print "Dead band adjustment: ", data, out
+    #print "Dead band adjustment: ", data, out
     return(out)
 
 def sat(data):
@@ -71,7 +71,7 @@ def scale_cal(data, axis):
 
 finish=False
 active=True
-speed=[0.0,0.0]
+speed=[0.0, 0.0, 0.0]
 while not finish:
     pygame.event.get()
     button_value=js.get_button(11)
@@ -80,10 +80,20 @@ while not finish:
     else:
         active=True
 
-    for axis in [1,2]:
+    for axis in [1,2,3]:
         value=js.get_axis(axis)
-                #print "Updating speed value"
+        print "Updating speed value", axis, value
         if axis==1:
+            if value>0:
+                if value>max_val[2]:
+                    print "Increasing max_val for Z", value
+                    max_val[2]=value
+            else:
+                if value<min_val[2]:
+                    print "Decreasing min_val for Z", value
+                    min_val[2]=value
+            speed[2]=joy_to_distance(dead_band_transform(scale_cal(value, 2)))
+        elif axis==2:
             if value>0:
                 if value>max_val[0]:
                     print "Increasing max_val for X", value
@@ -92,8 +102,8 @@ while not finish:
                 if value<min_val[0]:
                     print "Decreasing min_val for X", value
                     min_val[0]=value
-            speed[1]=joy_to_distance(dead_band_transform(scale_cal(value, 0)))
-        else:
+            speed[0]=joy_to_distance(dead_band_transform(scale_cal(value, 0)))
+        elif axis==3:
             if value>0:
                 if value>max_val[1]:
                     print "Increasing max_val for Y", value
@@ -102,15 +112,15 @@ while not finish:
                 if value<min_val[1]:
                     print "Decreasing min_val for Y", value
                     min_val[1]=value
-            speed[0]=joy_to_distance(dead_band_transform(scale_cal(value, 1)))
+            speed[1]=joy_to_distance(dead_band_transform(scale_cal(value, 1)))
 
 
     if not active:
-        speed=[0.0,0.0]
+        speed=[0.0, 0.0, 0.0]
     #print "Sending control command: ", speed
     output_bottle=output_port.prepare()
     output_bottle.clear()
-    output_bottle.addString("speed "+str(speed[0])+" "+str(speed[1])) #speed in meters per second
+    output_bottle.addString("speed "+str(speed[0])+" "+str(speed[1])+" "+str(speed[2])) #speed in meters per second
     output_port.write()
     yarp.Time.delay(0.001)
 

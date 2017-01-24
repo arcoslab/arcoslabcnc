@@ -222,37 +222,43 @@ if __name__=="__main__":
 
   motx=Stepper(2, 3, 4, step=0.225)
   moty=Stepper(17, 27, 22, step=0.225)
+  motz=Stepper(10, 9, 11, step=0.1125) # half the step of the others because of the belt reduction factor
   #motz=Stepper(10, 9, 11)
   axisx=Axis(motx)
   axisy=Axis(moty)
+  axisz=Axis(motz)
   axisx.enable()
   axisy.enable()
+  axisz.enable()
 
   while True:
     input_bottle=input_port.read(False)
     if input_bottle:
       input_data=input_bottle.get(0).asString()
-      #print "Input data: ", input_data
+      print "Input data: ", input_data
       data=input_data.split(" ")
       #print "Data: ", data
       if data[0]=="speed":
-        #print "Speed command: ", float(data[1]), float(data[2])
+        #print "Speed command: ", float(data[1]), float(data[2]), float(data[3])
         axisx.move(0.01, speed=float(data[1]))
         axisy.move(0.01, speed=float(data[2]))
+        axisz.move(0.01, speed=float(data[3]))
       elif data[0]=="move":
-        if (not motx.isBusy()) and (not moty.isBusy()):
-          axisx.move(float(data[1]), speed=float(data[3]))
-          axisy.move(float(data[2]), speed=float(data[3]))
+        if (not motx.isBusy()) and (not moty.isBusy()) and (not motz.isBusy()):
+          axisx.move(float(data[1]), speed=float(data[4]))
+          axisy.move(float(data[2]), speed=float(data[4]))
+          axisz.move(float(data[3]), speed=float(data[4]))
         else:
           print "Still executing previous command, ignoring new command"
       elif data[0]=="move_abs":
-        if (not motx.isBusy()) and (not moty.isBusy()):
-          axisx.move_abs(float(data[1]), speed=float(data[3]))
-          axisy.move_abs(float(data[2]), speed=float(data[3]))
+        if (not motx.isBusy()) and (not moty.isBusy()) and (not motz.isBusy()):
+          axisx.move_abs(float(data[1]), speed=float(data[4]))
+          axisy.move_abs(float(data[2]), speed=float(data[4]))
+          axisz.move_abs(float(data[3]), speed=float(data[4]))
         else:
           print "Still executing previous command, ignoring new command"
       elif data[0]=="status":
-        busy=motx.isBusy() or moty.isBusy()
+        busy=motx.isBusy() or moty.isBusy() or motz.isBusy()
         status_bottle=status_port.prepare()
         status_bottle.clear()
         status_bottle.addInt(int(busy))
@@ -261,10 +267,12 @@ if __name__=="__main__":
         print "stop"
         motx.stop()
         moty.stop()
+        motz.stop()
       elif data[0]=="enable":
         print "Enable"
         motx.enable()
         moty.enable()
+        motz.enable()
       elif data[0]=="up":
         print "Pull drill up"
         raw_input()
@@ -277,17 +285,22 @@ if __name__=="__main__":
         pos_bottle.clear()
         pos_bottle.addDouble(axisx.cur_pos)
         pos_bottle.addDouble(axisy.cur_pos)
+        pos_bottle.addDouble(axisz.cur_pos)
         pos_bottle.addDouble(axisx.cur_pos/0.0254)
         pos_bottle.addDouble(axisy.cur_pos/0.0254)
+        pos_bottle.addDouble(axisz.cur_pos/0.0254)
         pos_port.write()
       elif data[0]=="reset_pos":
         print "Resetting position!"
         motx.reset_pos()
         moty.reset_pos()
+        motz.reset_pos()
     motx.update()
     moty.update()
+    motz.update()
     axisx.update()
     axisy.update()
+    axisz.update()
     yarp.Time.delay(0.00001)
 
   #circle1=Circle(axisx, axisy)
