@@ -45,6 +45,8 @@ while not yarp.Network.isConnected(server_status_port_name, status_port_name):
 busy=True
 while busy:
     print "Waiting for last command to finish"
+    while status_port.getPendingReads()>0:
+        status_port.read(True)
     output_bottle=output_port.prepare()
     output_bottle.clear()
     output_bottle.addString("status")

@@ -61,7 +61,7 @@ class Circle:
                 #print "Angle: ", angle, "X, Y: ", x, y, x-old_x, y-old_y
                 #raw_input()
                 #cmds.append("move "+str(x-old_x)+" "+str(y-old_y)+" "+str(speed))
-                cmds.append("move_abs "+str(x+centerx)+" "+str(y+centery)+" "+str(speed))
+                cmds.append("move_abs "+str(x+centerx)+" "+str(y+centery)+" "+"0.0"+" "+str(speed))
                 old_x=x
                 old_y=y
             #cmds.append("down")
