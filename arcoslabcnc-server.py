@@ -306,10 +306,19 @@ if __name__=="__main__":
       data=input_data.split(" ")
       #print "Data: ", data
       if data[0]=="speed":
-        #print "Speed command: ", float(data[1]), float(data[2]), float(data[3])
-          axisx.move(0.01, speed=float(data[1]))
-          axisy.move(0.01, speed=float(data[2]))
-          axisz.move(0.01, speed=float(data[3]))
+          print "Speed command: ", float(data[1]), float(data[2]), float(data[3])
+          if float(data[1])<0.:
+              axisx.move2(-0.01, speed=-float(data[1]))
+          else:
+              axisx.move2(0.01, speed=float(data[1]))
+          if float(data[2])<0.:
+              axisy.move2(-0.01, speed=-float(data[2]))
+          else:
+              axisy.move2(0.01, speed=float(data[2]))
+          if float(data[3])<0.:
+              axisz.move2(-0.01, speed=-float(data[3]))
+          else:
+              axisz.move2(0.01, speed=float(data[3]))
       elif data[0]=="move":
           if (not motx.isBusy2()) and (not moty.isBusy2()) and (not motz.isBusy2()):
               dx=float(data[1])
