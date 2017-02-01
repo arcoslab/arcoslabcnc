@@ -42,6 +42,9 @@ class Axis:
         #print "Moving: ", distance/self.pitch, " revolutions"
         self.stepper.move_angle(360.0*distance/self.pitch, speed/self.pitch)
 
+    def move2(self, distance, speed=0.001):
+        self.move_abs2(self.cur_pos+distance, speed=speed)
+
     def move_abs(self, pos, speed=0.001):
         self.move(pos-self.cur_pos, speed)
 
@@ -309,9 +312,20 @@ if __name__=="__main__":
           axisz.move(0.01, speed=float(data[3]))
       elif data[0]=="move":
           if (not motx.isBusy2()) and (not moty.isBusy2()) and (not motz.isBusy2()):
-              axisx.move(float(data[1]), speed=float(data[4]))
-              axisy.move(float(data[2]), speed=float(data[4]))
-              axisz.move(float(data[3]), speed=float(data[4]))
+              dx=float(data[1])
+              dy=float(data[2])
+              dz=float(data[3])
+              d=sqrt((dx)**2+(dy)**2+(dz)**2)
+              if d>0:
+                  speedx=float(data[4])*abs((dx)/d)
+                  speedy=float(data[4])*abs((dy)/d)
+                  speedz=float(data[4])*abs((dz)/d)
+                  #print "d: ", d, speedx, speedy, speedz
+                  axisx.move2(dx, speed=speedx)
+                  axisy.move2(dy, speed=speedy)
+                  axisz.move2(dz, speed=speedz)
+              else:
+                  print "Don't move!, already there!"
           else:
               print "Still executing previous command, ignoring new command"
       elif data[0]=="move_abs":
