@@ -1,16 +1,16 @@
 #!/usr/bin/python
-#usage: ./circle.py <centerx> <centery> <radius> <turns> <cut_speed> <angle resolution factor> <in/cm>
+#usage: ./circle.py <centerx> <centery> <centerz> <radius> <turns> <cut_speed> <angle resolution factor> <in/cm>
 from math import pi, atan, sin, cos
 import sys
 motor_step=(0.225, 0.225) #degrees
 screw_pitch=(0.005, 0.005) #meters
 move_speed=0.005
 
-if sys.argv[7]=="in":
+if sys.argv[8]=="in":
     system_factor=0.0254
-elif sys.argv[7]=="m":
+elif sys.argv[8]=="m":
     system_factor=1.0
-elif sys.argv[7]=="mm":
+elif sys.argv[8]=="mm":
     system_factor=0.001
 else:
     print "Specify system"
@@ -32,7 +32,7 @@ class Circle:
         self.move_speed=0.005
         self.cut_speed=0.0005
 
-    def do_circle(self, centerx, centery, radius, cut_speed=0.03, move_speed=0.05, turns=1, angle_res_factor=1.0):
+    def do_circle(self, centerx, centery, centerz, radius, cut_speed=0.03, move_speed=0.05, turns=1, angle_res_factor=1.0):
         cmds=[]
         step_angle=angle_res_factor*atan(self.res_x/radius)*360.0/(2.*pi)
         print "Step angle: ", step_angle
@@ -61,7 +61,7 @@ class Circle:
                 #print "Angle: ", angle, "X, Y: ", x, y, x-old_x, y-old_y
                 #raw_input()
                 #cmds.append("move "+str(x-old_x)+" "+str(y-old_y)+" "+str(speed))
-                cmds.append("move_abs "+str(x+centerx)+" "+str(y+centery)+" "+"0.0"+" "+str(speed))
+                cmds.append("move_abs "+str(x+centerx)+" "+str(y+centery)+" "+str(centerz)+" "+str(speed))
                 old_x=x
                 old_y=y
             #cmds.append("down")
@@ -122,7 +122,7 @@ while busy:
 print "Last command finished"
 
 circle0=Circle(motor_step=motor_step, screw_pitch=screw_pitch)
-cmds=circle0.do_circle(system_factor*float(sys.argv[1]), system_factor*float(sys.argv[2]), system_factor*float(sys.argv[3]), cut_speed=float(sys.argv[5]), move_speed=move_speed, turns=int(sys.argv[4]), angle_res_factor=float(sys.argv[6]))
+cmds=circle0.do_circle(system_factor*float(sys.argv[1]), system_factor*float(sys.argv[2]), system_factor*float(sys.argv[3]), system_factor*float(sys.argv[4]), cut_speed=float(sys.argv[6]), move_speed=move_speed, turns=int(sys.argv[5]), angle_res_factor=float(sys.argv[7]))
 
 #print "Cmds: ", cmds
 print "Num cmds: ", len(cmds)

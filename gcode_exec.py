@@ -1,5 +1,5 @@
 #!/usr/bin/python
-#usage: ./gcode_exec.py <gcode_file> <cut_speed> <fast_speed>
+#usage: ./gcode_exec.py <gcode_file> <cut_speed> <fast_speed> <start_line>
 import sys
 from time import sleep
 import re
@@ -8,6 +8,11 @@ from time import time as time_now
 print sys.argv
 
 start_t=time_now()
+
+start_line=int(sys.argv[4])
+
+print "Start line: ", start_line
+raw_input()
 
 output_port_name="/gcode/cmd:o"
 status_port_name="/gcode/status:i"
@@ -76,9 +81,42 @@ system_factor=0.001
 
 lines=gcode_h.readlines()
 
+jump_to_future=False
+
+temp_start_line=0
+for i, line in enumerate(lines):
+    print "Line: ", line[:-1], " i: ", i, " of ", len(lines), " lines ", i*100.0/len(lines), "%"
+    if i==start_line:
+        print "finished search"
+        break
+    line=line.strip()
+    if line[0]==";":
+        print "Comment line, ignoring"
+        continue
+    cmds=line.split(" ")
+    has_x=False
+    has_y=False
+    for cmd in cmds:
+        print cmd
+        if cmd[0]=="X":
+            has_x=True
+        if cmd[0]=="Y":
+            has_y=True
+    if has_x and has_y:
+        print "Has both!!", i
+        temp_start_line=i
+print "Last X and Y before start line in: ", temp_start_line
+raw_input()
+z=5.0
+start_line=temp_start_line
+
 for i, line in enumerate(lines):
     print
     print "Line: ", line[:-1], " i: ", i, " of ", len(lines), " lines ", i*100.0/len(lines), "%"
+    if jump_to_future:
+        if i<start_line:
+            print "Skipping line"
+            continue
     line=line.strip()
     if line[0]==";":
         print "Comment line, ignoring"
@@ -86,6 +124,7 @@ for i, line in enumerate(lines):
     cmds=line.split(" ")
     exec_motion=False
     prev_cmd=""
+    z_down_in=False
     for cmd in cmds:
         print "Interpreting cmd: ", cmd
         if (cmd[0]==";") or (cmd[0]=="("):
@@ -150,6 +189,9 @@ for i, line in enumerate(lines):
                 value=float(cmd_tmp[1])
                 print "Waiting for: ", value, " seconds"
                 sleep(value)
+                if start_line>0:
+                    print "Starting ahead!"
+                    jump_to_future=True
         elif cmd=="G1":
             print "Linear move"
             movement_type="linear"
@@ -165,9 +207,15 @@ for i, line in enumerate(lines):
             exec_motion=True
         elif cmd[0]=="Z":
             cmd_tmp=re.split('(-*\d+\.*\d*)', cmd)
+            z_old=z
             z=float(cmd_tmp[1])
             print "Z: ", z
             exec_motion=True
+            if z<z_old:
+                print "Moving down"
+                if z<=0.0:
+                    print "Moving inside"
+                    z_down_in=True
         else:
             print "Cmd unknown"
             raw_input()
@@ -178,6 +226,12 @@ for i, line in enumerate(lines):
             speed=cut_speed
         else:
             speed=cut_speed
+        if z_down_in:
+            print "Moving in z cutting, even slower"
+            z_scale=0.25
+        else:
+            z_scale=1.0
+        speed*=z_scale
         print "Moving to: ", x, y, z, " speed: ", speed
         #raw_input()
         busy=True
@@ -202,6 +256,13 @@ for i, line in enumerate(lines):
         print "Last command finished"
         output_bottle=output_port.prepare()
         output_bottle.clear()
+        if z_down_in:
+            if system_factor*z_old>0.1:
+                print "Starts above 0.1 z, then we split the movement"
+                if rel:
+                    output_bottle.addString("move "+str(system_factor*x)+" "+str(system_factor*y)+" "+str(0.1)+" "+str(fast_speed)) #speed in meters per second
+                else:
+                    output_bottle.addString("move_abs "+str(system_factor*x)+" "+str(system_factor*y)+" "+str(0.1)+" "+str(fast_speed)) #speed in meters per second
         if rel:
             output_bottle.addString("move "+str(system_factor*x)+" "+str(system_factor*y)+" "+str(system_factor*z)+" "+str(speed)) #speed in meters per second
         else:

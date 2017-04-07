@@ -58,6 +58,9 @@ class Axis:
         #print "Moving: ", distance/self.pitch, " revolutions"
         self.stepper.move_angle2(360.0*pos/self.pitch, speed/self.pitch)
 
+    def set_to(self, pos):
+        self.stepper.set_to(360.0*pos/self.pitch)
+        
     def update(self):
         self.cur_pos=(self.stepper.cur_angle/360.0)*self.pitch
 
@@ -128,6 +131,11 @@ class Stepper:
         self.cur_angle=0.0
         self.ref_angle=0.0
         self.cur_steps=0
+        self.step_rest=0.0
+
+    def set_to(self, angle):
+        self.cur_angle=angle
+        self.ref_angle=angle
         self.step_rest=0.0
 
     def enable(self):
@@ -362,7 +370,7 @@ if __name__=="__main__":
           status_bottle=status_port.prepare()
           status_bottle.clear()
           status_bottle.addInt(int(busy))
-          status_port.write()
+          status_port.writeStrict()
       elif data[0]=="stop":
         print "stop"
         motx.stop()
@@ -395,14 +403,19 @@ if __name__=="__main__":
         motx.reset_pos()
         moty.reset_pos()
         motz.reset_pos()
+      elif data[0]=="reset_z":
+          print "input data: ", data
+          z=float(data[1])
+          print "Reset z to: ", z
+          axisz.set_to(z)
     if counter>1000:
           counter=0
           #print "Status: ", motx.isBusy2(), moty.isBusy2(), motz.isBusy2(), " Cur ref: ", motx.ref_angle, moty.ref_angle, motz.ref_angle, " Cur angle: ", motx.cur_angle, moty.cur_angle, motz.cur_angle
           busy=motx.isBusy2() or moty.isBusy2() or motz.isBusy2()
-          status_bottle=status_port.prepare()
-          status_bottle.clear()
-          status_bottle.addInt(int(busy))
-          status_port.write()
+          #status_bottle=status_port.prepare()
+          #status_bottle.clear()
+          #status_bottle.addInt(int(busy))
+          #status_port.write()
     counter+=1
     motx.update2()
     moty.update2()
