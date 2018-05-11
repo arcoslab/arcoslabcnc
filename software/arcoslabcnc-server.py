@@ -6,8 +6,8 @@ from time import sleep
 import time
 from multiprocessing import Process, Queue
 from math import sqrt, atan, pi, cos, sin
-from numpy import arctan2, floor
-from misc import Angle
+from numpy import arctan2, floor, array
+from misc import Angle, create_object_vis, set_axis_vis, set_cmd_vis
 
 input_port_name="/cnc/cmd:i"
 status_port_name="/cnc/status:o"
@@ -163,6 +163,213 @@ class PreciseSpeed:
 
   def move_steps(self, steps, freq=1.0):
     self.queue.put((steps, freq))
+
+class CNC_sim:
+    def __init__(self):
+        #step in degrees
+        self.objects_port=yarp.BufferedPortBottle()
+
+        objectportname="/simcnc/objects:o"
+        objectvisportname="/myvis/roboviewer/objects:i"
+        self.objects_port.open(objectportname)
+        self.objects_port.setStrict(True)
+        cstyle=yarp.ContactStyle()
+        cstyle.persistent=True
+        yarp.Network.connect(objectportname, objectvisportname, cstyle)
+        #yarp.Network.connect(objectportname, "/tmp/port/1", cstyle)
+        while not (yarp.Network.isConnected(objectportname, objectvisportname)):
+            print "Waiting connection"
+        self.cyl_obj_num=1
+        create_object_vis(self.objects_port, self.cyl_obj_num, "cylinder", [0.05, 0.05, 0.3], [0, 0, 0], [1, 0, 0])
+        z_axis=array([0., 0., 1.])
+        set_axis_vis(self.objects_port, self.cyl_obj_num, z_axis)
+        self.cur_pos=array([0.,0.,1.])
+        set_cmd_vis(self.objects_port, self.cyl_obj_num, "trans", self.cur_pos)
+        set_cmd_vis(self.objects_port, self.cyl_obj_num, "timeout", [-1])
+
+    def move(self, dist, axis):
+        self.cur_pos[axis]=dist
+        set_cmd_vis(self.objects_port, self.cyl_obj_num, "trans", self.cur_pos)
+
+
+class Stepper_sim:
+    def __init__(self, vis, axis=0, step=0.9, period=0.002):
+        #step in degrees
+        self.axis=axis
+        self.vis=vis
+        self.step=step
+        self.on_time=period/2.
+        self.off_time=self.on_time
+        self.dir_wait=self.on_time
+        self.step_rest=0.0
+        self.period=0.0
+        self.disable()
+        self.time=time.time()
+        self.time_last_toggle=self.time
+        self.state=False
+        self.steps=0
+        self.ref_angle=0.0
+        self.cur_angle=0.0
+        self.cur_steps=0
+        self.cur_dir=False
+        self.last_vis_angle=0.0
+
+    def reset_pos(self):
+        self.cur_angle=0.0
+        self.ref_angle=0.0
+        self.cur_steps=0
+        self.step_rest=0.0
+
+    def set_to(self, angle):
+        self.cur_angle=angle
+        self.ref_angle=angle
+        self.step_rest=0.0
+
+    def enable(self):
+        self._enable=True
+
+    def is_moving(self):
+        return(self.pulse._blink_thread.isAlive())
+
+    def disable(self):
+        self._enable=False
+
+    def stop(self):
+        self.disable()
+        self.steps=0
+        self.step_rest=0.0
+
+
+    def move_angle2(self, angle, rps):
+        #absolute
+        self.ref_angle=angle
+        self.period=1.0/(rps*360.0/self.step)
+
+    def move_angle(self, delta_angle, rps):
+        #angle in degrees
+        #rps rev per second
+        print "Moving: ", delta_angle/self.step, " steps"
+        total_steps=self.step_rest+delta_angle/self.step
+        step_rest=total_steps-float(int(total_steps))
+        print "Total steps: ", total_steps, " step rest: ", step_rest
+        if abs(step_rest)>=0.5:
+            #print "Stepping one more!"
+            if step_rest>0:
+                steps=int(total_steps)+1
+            else:
+                steps=int(total_steps)-1
+        else:
+            #print "Stepping truncated"
+            steps=int(total_steps)
+        self.step_rest=total_steps-steps
+        #print "Step rest: ", self.step_rest
+        self.move_steps(steps, rps*360.0/self.step)
+
+    def move_steps(self, steps, speed):
+        #speed in steps per second
+        self.period=1.0/speed
+        self.steps=abs(steps)
+        #print "Steps: ", steps, " Speed: ", speed, " period: ", self.period
+        if self._enable:
+            if steps<0:
+            #    print "Pos dir"
+                self.direction.on()
+                self.cur_dir=True
+            else:
+            #    print "Neg dir"
+                self.direction.off()
+                self.cur_dir=False
+            #sleep(self.dir_wait)
+            #print "Pulsing"
+            #self.pulse.blink(on_time=period/2.0, off_time=period/2.0, n=abs(steps), background=True)
+            #self.toggle(n=abs(steps))
+            #self.precisespeed.move_steps(abs(steps), speed)
+            #print "Finished pulsing"
+
+    def update(self):
+      #print "Updating motor"
+      if self._enable:
+        new_time=time.time()
+        if self.period==0.0:
+          self.pulse.off()
+        else:
+          if (new_time-self.time_last_toggle)>=self.period:
+            #print "*****Time to toggle! ", new_time-self.time_last_toggle
+            self.time_last_toggle=new_time
+            #print "Steps left: ", self.steps
+            if self.steps>0:
+              if self.state:
+                self.pulse.off()
+                self.state=False
+                self.steps-=1
+              else:
+                self.pulse.on()
+                self.state=True
+                if self.cur_dir:
+                  self.cur_steps-=1
+                else:
+                  self.cur_steps+=1
+                self.cur_angle=self.cur_steps*self.step
+
+    def update2(self):
+      #print "Updating motor"
+      if self._enable:
+        new_time=time.time()
+        if self.period==0.0:
+            pass
+        else:
+          if (new_time-self.time_last_toggle)>=self.period:
+            #print "*****Time to toggle! ", new_time-self.time_last_toggle
+            self.time_last_toggle=new_time
+            #print "Steps left: ", self.steps
+            delta_angle=self.ref_angle-self.cur_angle
+            #print "Delta angle: ", delta_angle
+            if abs(delta_angle)>(self.step/2.0):
+                #print "Correcting"
+                if delta_angle>0:
+                    if self.cur_dir==True:
+                        self.cur_dir=False
+                        sleep(0.001)
+                    self.cur_angle+=self.step
+                else:
+                    if self.cur_dir==False:
+                        self.cur_dir=True
+                        sleep(0.001)
+                    self.cur_angle-=self.step
+                #print "Cur angle: ", self.cur_angle
+                if abs(self.cur_angle-self.last_vis_angle)>10.0:
+                    #print "Visualizing angle. ", self.cur_angle
+                    self.vis.move(self.cur_angle*0.0001, self.axis)
+                    self.last_vis_angle=self.cur_angle
+            else:
+                #print "Not correction, update vis now. ", self.cur_angle
+                self.vis.move(self.cur_angle*0.0001, self.axis)
+                self.last_vis_angle=self.cur_angle
+
+    def isBusy2(self):
+        if abs(self.ref_angle-self.cur_angle)>(self.step/2.0):
+            return(True)
+        else:
+            return(False)
+
+    def isBusy(self):
+        print "is Busy, steps: ", self.steps
+        if self.steps==0:
+            return(False)
+        else:
+            return(True)
+
+    def toggle(self, n=1):
+        for i in xrange(n):
+            self.pulse.on()
+            sleep(self.on_time)
+            self.pulse.off()
+            sleep(self.on_time)
+
+    def __del__(self):
+        self.disable()
+
+
 
 class Stepper:
     def __init__(self, pulse_pin, dir_pin, ena_pin, step=0.9, period=0.002):
@@ -356,10 +563,16 @@ if __name__=="__main__":
   status_port.open(status_port_name)
   pos_port=yarp.BufferedPortBottle()
   pos_port.open(pos_port_name)
-
-  motx=Stepper(2, 3, 4, step=0.225)
-  moty=Stepper(17, 27, 22, step=0.225)
-  motz=Stepper(10, 9, 11, step=0.1125) # half the step of the others because of the belt reduction factor
+  sim=False
+  if sim:
+      cncsim=CNC_sim()
+      motx=Stepper_sim(cncsim, axis=0, step=0.225)
+      moty=Stepper_sim(cncsim, axis=1, step=0.225)
+      motz=Stepper_sim(cncsim, axis=2, step=0.1125)
+  else:
+      motx=Stepper(2, 3, 4, step=0.225)
+      moty=Stepper(17, 27, 22, step=0.225)
+      motz=Stepper(10, 9, 11, step=0.1125) # half the step of the others because of the belt reduction factor
   #motz=Stepper(10, 9, 11)
   axisx=Axis(motx)
   axisy=Axis(moty)
@@ -445,6 +658,19 @@ if __name__=="__main__":
                       axisx.move_abs2(ax, speed=speedx)
                       axisy.move_abs2(ay, speed=speedy)
                       axisz.move_abs2(az, speed=speedz)
+                      motx.update2()
+                      moty.update2()
+                      motz.update2()
+                      axisx.update()
+                      axisy.update()
+                      axisz.update()
+                      while (motx.isBusy2()) or (moty.isBusy2()) or (motz.isBusy2()):
+                          motx.update2()
+                          moty.update2()
+                          motz.update2()
+                          axisx.update()
+                          axisy.update()
+                          axisz.update()
               else:
                   print "Don't move!, already there!"
           else:

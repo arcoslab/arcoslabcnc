@@ -244,7 +244,7 @@ for i, line in enumerate(lines):
             speed=cut_speed
         else:
             speed=cut_speed
-        if z_down_in:
+        if z_down_in and movement_type!="arc":
             print "Moving in z cutting, even slower"
             z_scale=0.25
         else:
