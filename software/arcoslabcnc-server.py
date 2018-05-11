@@ -5,7 +5,9 @@ from gpiozero import DigitalOutputDevice as pwm
 from time import sleep
 import time
 from multiprocessing import Process, Queue
-from math import sqrt
+from math import sqrt, atan, pi, cos, sin
+from numpy import arctan2, floor
+from misc import Angle
 
 input_port_name="/cnc/cmd:i"
 status_port_name="/cnc/status:o"
@@ -15,11 +17,73 @@ pos_port_name="/cnc/pos:o"
 #Y inverted
 #Z inverted
 
+def arc_point_to_angle(center_x, center_y, x, y):
+    return(Angle(arctan2(y-center_y, x-center_x)))
+
+def gen_arc(cur_x, cur_y, cur_z, x, y ,z, i, j, res, speed, angle_res_factor=1.0):
+    center_x=cur_x+i
+    center_y=cur_y+j
+    radius=sqrt(i**2+j**2)
+    arc_length=2.0*pi*radius
+    print "Radius: ", radius, " Radius pos: ", center_x, center_y
+    print "Initial pos: ", cur_x, cur_y, cur_z
+    angle_res=Angle(angle_res_factor*atan(res/radius)*360.0/(2.*pi))
+    print "Angle resolution: ", angle_res
+    start_angle=arc_point_to_angle(center_x, center_y, cur_x, cur_y)
+    end_angle=arc_point_to_angle(center_x, center_y, x, y)
+    print "Start angle: ", start_angle
+    print "Stop angle: ", end_angle
+    angle_diff=end_angle-start_angle
+    print "Angle difference: ", angle_diff
+    angles=floor(angle_diff/angle_res.angle)+1
+    print "Angles: ", angles
+    #get points in angle range
+    z_step=(z-cur_z)/angles
+    print "Z step: ", z_step
+    inside=True
+    angle=start_angle
+    arc_points=[]
+    arc_x=cur_x
+    arc_y=cur_y
+    arc_z=cur_z
+    while True:
+        angle-=angle_res
+        if not angle.between(end_angle, start_angle):
+            print "angle outside, finishing"
+            break
+        print "Current angle: ", angle
+
+        old_arc_x=arc_x
+        old_arc_y=arc_y
+        old_arc_z=arc_z
+
+        arc_x=radius*cos(angle.angle)+center_x
+        arc_y=radius*sin(angle.angle)+center_y
+        arc_z=arc_z+z_step
+
+        d=sqrt((arc_x-old_arc_x)**2+(arc_y-old_arc_y)**2+(arc_z-old_arc_z)**2)
+        speedx=float(speed)*abs((arc_x-old_arc_x)/d)
+        speedy=float(speed)*abs((arc_y-old_arc_y)/d)
+        speedz=float(speed)*abs((arc_z-old_arc_z)/d)
+
+        print "Next pos: ", arc_x, arc_y, arc_z, speedx, speedy, speedz
+        arc_points.append([arc_x,arc_y,arc_z, speedx, speedy, speedz])
+    d=sqrt((x-arc_x)**2+(y-arc_y)**2+(z-arc_z)**2)
+    speedx=float(speed)*abs((x-arc_x)/d)
+    speedy=float(speed)*abs((y-arc_y)/d)
+    speedz=float(speed)*abs((z-arc_z)/d)
+    arc_points.append([x, y, z, speedx, speedy, speedz])
+    print "Last pos: ", x, y , z, speedx, speedy, speedz
+    print "Arc points: ", len(arc_points)
+    return(arc_points)
+
+
 class Axis:
     def __init__(self, stepper, pitch=0.005):
         #pitch = meters per revolution
         self.pitch=pitch
         self.stepper=stepper
+        self.res=(self.stepper.step/360.)*self.pitch
 
     def disable(self):
         self.stepper.disable()
@@ -360,6 +424,27 @@ if __name__=="__main__":
                   axisx.move_abs2(x, speed=speedx)
                   axisy.move_abs2(y, speed=speedy)
                   axisz.move_abs2(z, speed=speedz)
+              else:
+                  print "Don't move!, already there!"
+          else:
+              print "Still executing previous command, ignoring new command"
+      elif data[0]=="move_abs_arc":
+          print "Input data: ", data
+          if (not motx.isBusy2()) and (not moty.isBusy2()) and (not motz.isBusy2()):
+              x=float(data[1])
+              y=float(data[2])
+              z=float(data[3])
+              i_arc=float(data[4])
+              j_arc=float(data[5])
+              speed=float(data[6])
+              angle_res_factor=float(data[7])
+              d=sqrt((x-axisx.cur_pos)**2+(y-axisy.cur_pos)**2+(z-axisz.cur_pos)**2)
+              if d>0.0:
+                  arc_cmd_list=gen_arc(axisx.cur_pos, axisy.cur_pos, axisz.cur_pos, x, y , z, i_arc, j_arc, axisx.res, speed, angle_res_factor)
+                  for ax,ay,az,speedx,speedy,speedz in arc_cmd_list:
+                      axisx.move_abs2(ax, speed=speedx)
+                      axisy.move_abs2(ay, speed=speedy)
+                      axisz.move_abs2(az, speed=speedz)
               else:
                   print "Don't move!, already there!"
           else:

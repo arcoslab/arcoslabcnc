@@ -1,5 +1,5 @@
 #!/usr/bin/python
-#usage: ./gcode_exec.py <gcode_file> <cut_speed> <fast_speed> <start_line>
+#usage: ./gcode_exec.py <gcode_file> <cut_speed> <fast_speed> <start_line> <angle_res_factor>
 import sys
 from time import sleep
 import re
@@ -20,6 +20,7 @@ server_input_port_name="/cnc/cmd:i"
 server_status_port_name="/cnc/status:o"
 cut_speed=float(sys.argv[2])
 fast_speed=float(sys.argv[3])
+angle_res_factor=float(sys.argv[5])
 
 import yarp
 yarp.Network.init()
@@ -125,6 +126,7 @@ for i, line in enumerate(lines):
     exec_motion=False
     prev_cmd=""
     z_down_in=False
+    spindle_speed=0.0
     for cmd in cmds:
         print "Interpreting cmd: ", cmd
         if (cmd[0]==";") or (cmd[0]=="("):
@@ -161,6 +163,7 @@ for i, line in enumerate(lines):
             spindle_cmd=re.split('(\d+\.*\d*)', cmd)
             spindle_speed=float(spindle_cmd[1])
             print "Spidle speed: ", spindle_speed
+            raw_input()
         elif cmd[0]=="T":
             cmd_tmp=re.split('(\d+\.*\d*)', cmd)
             value=float(cmd_tmp[1])
@@ -195,6 +198,9 @@ for i, line in enumerate(lines):
         elif cmd=="G1":
             print "Linear move"
             movement_type="linear"
+        elif cmd=="G2":
+            print "Arc move"
+            movement_type="arc"
         elif cmd[0]=="X":
             cmd_tmp=re.split('(-*\d+\.*\d*)', cmd)
             x=float(cmd_tmp[1])
@@ -216,11 +222,23 @@ for i, line in enumerate(lines):
                 if z<=0.0:
                     print "Moving inside"
                     z_down_in=True
+        elif cmd[0]=="I":
+            cmd_tmp=re.split('(-*\d+\.*\d*)', cmd)
+            i_arc=float(cmd_tmp[1])
+            print "I: ", i_arc
+            exec_motion=True
+        elif cmd[0]=="J":
+            cmd_tmp=re.split('(-*\d+\.*\d*)', cmd)
+            j_arc=float(cmd_tmp[1])
+            print "J: ", j_arc
+            exec_motion=True
         else:
             print "Cmd unknown"
             raw_input()
     if exec_motion:
-        if movement_type=="rapid":
+        if movement_type=="arc":
+            speed=cut_speed
+        elif movement_type=="rapid":
             speed=fast_speed
         elif movement_type=="linear":
             speed=cut_speed
@@ -263,10 +281,13 @@ for i, line in enumerate(lines):
                     output_bottle.addString("move "+str(system_factor*x)+" "+str(system_factor*y)+" "+str(0.1)+" "+str(fast_speed)) #speed in meters per second
                 else:
                     output_bottle.addString("move_abs "+str(system_factor*x)+" "+str(system_factor*y)+" "+str(0.1)+" "+str(fast_speed)) #speed in meters per second
-        if rel:
-            output_bottle.addString("move "+str(system_factor*x)+" "+str(system_factor*y)+" "+str(system_factor*z)+" "+str(speed)) #speed in meters per second
+        if movement_type=="arc":
+            output_bottle.addString("move_abs_arc "+str(system_factor*x)+" "+str(system_factor*y)+" "+str(system_factor*z)+" "+str(system_factor*i_arc)+" "+str(system_factor*j_arc)+" "+str(speed)+" "+str(angle_res_factor)) #speed in meters per second
         else:
-            output_bottle.addString("move_abs "+str(system_factor*x)+" "+str(system_factor*y)+" "+str(system_factor*z)+" "+str(speed)) #speed in meters per second
+            if rel:
+                output_bottle.addString("move "+str(system_factor*x)+" "+str(system_factor*y)+" "+str(system_factor*z)+" "+str(speed)) #speed in meters per second
+            else:
+                output_bottle.addString("move_abs "+str(system_factor*x)+" "+str(system_factor*y)+" "+str(system_factor*z)+" "+str(speed)) #speed in meters per second
         output_port.writeStrict()
         while output_port.isWriting():
             print "Still writing"
