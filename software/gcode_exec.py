@@ -95,18 +95,21 @@ for i, line in enumerate(lines):
         print "Comment line, ignoring"
         continue
     cmds=line.split(" ")
+    has_g0=False
     has_x=False
     has_y=False
     for cmd in cmds:
         print cmd
+        if cmd=="G0":
+            has_g0=True
         if cmd[0]=="X":
             has_x=True
         if cmd[0]=="Y":
             has_y=True
-    if has_x and has_y:
-        print "Has both!!", i
+    if has_x and has_y and has_g0:
+        print "Has x y and g0!!", i
         temp_start_line=i
-print "Last X and Y before start line in: ", temp_start_line
+print "Last X and Y in G0 movement before start line in: ", temp_start_line
 raw_input()
 z=5.0
 start_line=temp_start_line
@@ -152,7 +155,7 @@ for i, line in enumerate(lines):
                 system_factor=1.0
             elif system=="mm":
                 system_factor=0.001
-            
+
         elif cmd=="G61":
             print "Exact Path mode. Ignoring for now (should not stop at each point, smooth movement"
         elif cmd[0]=="F":
@@ -183,6 +186,9 @@ for i, line in enumerate(lines):
         elif cmd=="G0":
             print "Rapid move"
             movement_type="rapid"
+            if start_line>0:
+                print "First G0 movement. Machine configured"
+                jump_to_future=True
         elif cmd=="G04":
             print "Wait"
             prev_cmd="G04"
