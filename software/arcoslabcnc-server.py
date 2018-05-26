@@ -17,6 +17,8 @@ pos_port_name="/cnc/pos:o"
 #Y inverted
 #Z inverted
 
+speed_scale=1.0
+
 def arc_point_to_angle(center_x, center_y, x, y):
     return(Angle(arctan2(y-center_y, x-center_x)))
 
@@ -180,8 +182,8 @@ class CNC_sim:
         while not (yarp.Network.isConnected(objectportname, objectvisportname)):
             print "Waiting connection"
         self.cyl_obj_num=1
-        create_object_vis(self.objects_port, self.cyl_obj_num, "cylinder", [0.05, 0.05, 0.3], [0, 0, 0], [1, 0, 0])
-        z_axis=array([0., 0., 1.])
+        create_object_vis(self.objects_port, self.cyl_obj_num, "cylinder", [0.0127/2, 0.0127/2, 0.0254*2], [0, 0, 0], [1, 0, 0])
+        z_axis=array([0., 0., 0.0254*2])
         set_axis_vis(self.objects_port, self.cyl_obj_num, z_axis)
         self.cur_pos=array([0.,0.,1.])
         set_cmd_vis(self.objects_port, self.cyl_obj_num, "trans", self.cur_pos)
@@ -318,7 +320,7 @@ class Stepper_sim:
         if self.period==0.0:
             pass
         else:
-          if (new_time-self.time_last_toggle)>=self.period:
+          if (new_time-self.time_last_toggle)>=(self.period/speed_scale):
             #print "*****Time to toggle! ", new_time-self.time_last_toggle
             self.time_last_toggle=new_time
             #print "Steps left: ", self.steps
@@ -506,7 +508,7 @@ class Stepper:
         if self.period==0.0:
           self.pulse.off()
         else:
-          if (new_time-self.time_last_toggle)>=self.period:
+          if (new_time-self.time_last_toggle)>=(self.period/speed_scale):
             #print "*****Time to toggle! ", new_time-self.time_last_toggle
             self.time_last_toggle=new_time
             #print "Steps left: ", self.steps
@@ -582,7 +584,24 @@ if __name__=="__main__":
   axisz.enable()
   busy=False
   counter=0
+  move_buffer=[]
   while True:
+    if len(move_buffer)>0:
+        if not ((motx.isBusy2()) or (moty.isBusy2()) or (motz.isBusy2())):
+            print "Executing new move buffer cmd"
+            ax, ay, az, speedx, speedy, speedz = move_buffer.pop(0)
+            axisx.move_abs2(ax, speed=speedx)
+            axisy.move_abs2(ay, speed=speedy)
+            axisz.move_abs2(az, speed=speedz)
+            motx.update2()
+            moty.update2()
+            motz.update2()
+            axisx.update()
+            axisy.update()
+            axisz.update()
+            buffer_moving=True
+    else:
+        buffer_moving=False
     input_bottle=input_port.read(False)
     if input_bottle:
       input_data=input_bottle.get(0).asString()
@@ -605,7 +624,7 @@ if __name__=="__main__":
           else:
               axisz.move2(0.01, speed=float(data[3]))
       elif data[0]=="move":
-          if (not motx.isBusy2()) and (not moty.isBusy2()) and (not motz.isBusy2()):
+          if (not buffer_moving) and (not motx.isBusy2()) and (not moty.isBusy2()) and (not motz.isBusy2()):
               dx=float(data[1])
               dy=float(data[2])
               dz=float(data[3])
@@ -624,7 +643,7 @@ if __name__=="__main__":
               print "Still executing previous command, ignoring new command"
       elif data[0]=="move_abs":
           print "Input data: ", data
-          if (not motx.isBusy2()) and (not moty.isBusy2()) and (not motz.isBusy2()):
+          if (not buffer_moving) and (not motx.isBusy2()) and (not moty.isBusy2()) and (not motz.isBusy2()):
               x=float(data[1])
               y=float(data[2])
               z=float(data[3])
@@ -643,7 +662,7 @@ if __name__=="__main__":
               print "Still executing previous command, ignoring new command"
       elif data[0]=="move_abs_arc":
           print "Input data: ", data
-          if (not motx.isBusy2()) and (not moty.isBusy2()) and (not motz.isBusy2()):
+          if (not buffer_moving) and (not motx.isBusy2()) and (not moty.isBusy2()) and (not motz.isBusy2()):
               x=float(data[1])
               y=float(data[2])
               z=float(data[3])
@@ -654,30 +673,34 @@ if __name__=="__main__":
               d=sqrt((x-axisx.cur_pos)**2+(y-axisy.cur_pos)**2+(z-axisz.cur_pos)**2)
               if d>0.0:
                   arc_cmd_list=gen_arc(axisx.cur_pos, axisy.cur_pos, axisz.cur_pos, x, y , z, i_arc, j_arc, axisx.res, speed, angle_res_factor)
-                  for ax,ay,az,speedx,speedy,speedz in arc_cmd_list:
-                      axisx.move_abs2(ax, speed=speedx)
-                      axisy.move_abs2(ay, speed=speedy)
-                      axisz.move_abs2(az, speed=speedz)
-                      motx.update2()
-                      moty.update2()
-                      motz.update2()
-                      axisx.update()
-                      axisy.update()
-                      axisz.update()
-                      while (motx.isBusy2()) or (moty.isBusy2()) or (motz.isBusy2()):
-                          motx.update2()
-                          moty.update2()
-                          motz.update2()
-                          axisx.update()
-                          axisy.update()
-                          axisz.update()
+                  move_buffer+=arc_cmd_list
+                  print "Buffer updated", move_buffer
+                  # for ax,ay,az,speedx,speedy,speedz in arc_cmd_list:
+                  #     print "Arc point: ", ax, ay, az
+                  #     #raw_input()
+                  #     axisx.move_abs2(ax, speed=speedx)
+                  #     axisy.move_abs2(ay, speed=speedy)
+                  #     axisz.move_abs2(az, speed=speedz)
+                  #     motx.update2()
+                  #     moty.update2()
+                  #     motz.update2()
+                  #     axisx.update()
+                  #     axisy.update()
+                  #     axisz.update()
+                  #     while (motx.isBusy2()) or (moty.isBusy2()) or (motz.isBusy2()):
+                  #         motx.update2()
+                  #         moty.update2()
+                  #         motz.update2()
+                  #         axisx.update()
+                  #         axisy.update()
+                  #         axisz.update()
               else:
                   print "Don't move!, already there!"
           else:
               print "Still executing previous command, ignoring new command"
       elif data[0]=="status":
           #print "Status: ", motx.isBusy2(), moty.isBusy2(), motz.isBusy2()
-          busy=motx.isBusy2() or moty.isBusy2() or motz.isBusy2()
+          busy=motx.isBusy2() or moty.isBusy2() or motz.isBusy2() or buffer_moving
           status_bottle=status_port.prepare()
           status_bottle.clear()
           status_bottle.addInt(int(busy))
@@ -719,10 +742,14 @@ if __name__=="__main__":
           z=float(data[1])
           print "Reset z to: ", z
           axisz.set_to(z)
+      elif data[0]=="speed_scale":
+          global speed_scale
+          speed_scale=float(data[1])
+          print "input data: ", data, " new speed scale: ", speed_scale
     if counter>1000:
           counter=0
           #print "Status: ", motx.isBusy2(), moty.isBusy2(), motz.isBusy2(), " Cur ref: ", motx.ref_angle, moty.ref_angle, motz.ref_angle, " Cur angle: ", motx.cur_angle, moty.cur_angle, motz.cur_angle
-          busy=motx.isBusy2() or moty.isBusy2() or motz.isBusy2()
+          busy=buffer_moving or motx.isBusy2() or moty.isBusy2() or motz.isBusy2()
           #status_bottle=status_port.prepare()
           #status_bottle.clear()
           #status_bottle.addInt(int(busy))
