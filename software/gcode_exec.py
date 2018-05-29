@@ -205,8 +205,11 @@ for i, line in enumerate(lines):
             print "Linear move"
             movement_type="linear"
         elif cmd=="G2":
-            print "Arc move"
-            movement_type="arc"
+            print "Arc move CW"
+            movement_type="arc_cw"
+        elif cmd=="G3":
+            print "Arc move CCW"
+            movement_type="arc_ccw"
         elif cmd[0]=="X":
             cmd_tmp=re.split('(-*\d+\.*\d*)', cmd)
             x=float(cmd_tmp[1])
@@ -242,7 +245,7 @@ for i, line in enumerate(lines):
             print "Cmd unknown"
             raw_input()
     if exec_motion:
-        if movement_type=="arc":
+        if (movement_type=="arc_cw") or (movement_type=="arc_ccw"):
             speed=cut_speed
         elif movement_type=="rapid":
             speed=fast_speed
@@ -250,7 +253,7 @@ for i, line in enumerate(lines):
             speed=cut_speed
         else:
             speed=cut_speed
-        if z_down_in and movement_type!="arc":
+        if z_down_in and movement_type!="arc_cw" and movement_type!="arc_ccw":
             print "Moving in z cutting, even slower"
             z_scale=0.25
         else:
@@ -287,8 +290,12 @@ for i, line in enumerate(lines):
                     output_bottle.addString("move "+str(system_factor*x)+" "+str(system_factor*y)+" "+str(0.1)+" "+str(fast_speed)) #speed in meters per second
                 else:
                     output_bottle.addString("move_abs "+str(system_factor*x)+" "+str(system_factor*y)+" "+str(0.1)+" "+str(fast_speed)) #speed in meters per second
-        if movement_type=="arc":
-            output_bottle.addString("move_abs_arc "+str(system_factor*x)+" "+str(system_factor*y)+" "+str(system_factor*z)+" "+str(system_factor*i_arc)+" "+str(system_factor*j_arc)+" "+str(speed)+" "+str(angle_res_factor)) #speed in meters per second
+        if movement_type=="arc_cw":
+            print "ARC_CW"
+            output_bottle.addString("move_abs_arc_cw "+str(system_factor*x)+" "+str(system_factor*y)+" "+str(system_factor*z)+" "+str(system_factor*i_arc)+" "+str(system_factor*j_arc)+" "+str(speed)+" "+str(angle_res_factor)) #speed in meters per second
+        elif movement_type=="arc_ccw":
+            print "ARC_CCW"
+            output_bottle.addString("move_abs_arc_ccw "+str(system_factor*x)+" "+str(system_factor*y)+" "+str(system_factor*z)+" "+str(system_factor*i_arc)+" "+str(system_factor*j_arc)+" "+str(speed)+" "+str(angle_res_factor)) #speed in meters per second
         else:
             if rel:
                 output_bottle.addString("move "+str(system_factor*x)+" "+str(system_factor*y)+" "+str(system_factor*z)+" "+str(speed)) #speed in meters per second

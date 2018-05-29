@@ -22,7 +22,7 @@ speed_scale=1.0
 def arc_point_to_angle(center_x, center_y, x, y):
     return(Angle(arctan2(y-center_y, x-center_x)))
 
-def gen_arc(cur_x, cur_y, cur_z, x, y ,z, i, j, res, speed, angle_res_factor=1.0):
+def gen_arc(cur_x, cur_y, cur_z, x, y ,z, i, j, res, speed, angle_res_factor=1.0, cw=True):
     center_x=cur_x+i
     center_y=cur_y+j
     radius=sqrt(i**2+j**2)
@@ -49,10 +49,16 @@ def gen_arc(cur_x, cur_y, cur_z, x, y ,z, i, j, res, speed, angle_res_factor=1.0
     arc_y=cur_y
     arc_z=cur_z
     while True:
-        angle-=angle_res
-        if not angle.between(end_angle, start_angle):
-            print "angle outside, finishing"
-            break
+        if cw:
+            angle-=angle_res
+            if not angle.between(end_angle, start_angle):
+                print "angle outside, finishing"
+                break
+        else:
+            angle+=angle_res
+            if not angle.between(start_angle, end_angle):
+                print "angle outside, finishing"
+                break
         print "Current angle: ", angle
 
         old_arc_x=arc_x
@@ -660,7 +666,11 @@ if __name__=="__main__":
                   print "Don't move!, already there!"
           else:
               print "Still executing previous command, ignoring new command"
-      elif data[0]=="move_abs_arc":
+      elif (data[0]=="move_abs_arc_cw") or (data[0]=="move_abs_arc_ccw"):
+          if data[0]=="move_abs_arc_cw":
+              cw=True
+          else:
+              cw=False
           print "Input data: ", data
           if (not buffer_moving) and (not motx.isBusy2()) and (not moty.isBusy2()) and (not motz.isBusy2()):
               x=float(data[1])
@@ -672,7 +682,7 @@ if __name__=="__main__":
               angle_res_factor=float(data[7])
               d=sqrt((x-axisx.cur_pos)**2+(y-axisy.cur_pos)**2+(z-axisz.cur_pos)**2)
               if d>0.0:
-                  arc_cmd_list=gen_arc(axisx.cur_pos, axisy.cur_pos, axisz.cur_pos, x, y , z, i_arc, j_arc, axisx.res, speed, angle_res_factor)
+                  arc_cmd_list=gen_arc(axisx.cur_pos, axisy.cur_pos, axisz.cur_pos, x, y , z, i_arc, j_arc, axisx.res, speed, angle_res_factor, cw=cw)
                   move_buffer+=arc_cmd_list
                   print "Buffer updated", move_buffer
                   # for ax,ay,az,speedx,speedy,speedz in arc_cmd_list:
