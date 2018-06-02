@@ -27,21 +27,21 @@ def gen_arc(cur_x, cur_y, cur_z, x, y ,z, i, j, res, speed, angle_res_factor=1.0
     center_y=cur_y+j
     radius=sqrt(i**2+j**2)
     arc_length=2.0*pi*radius
-    print "Radius: ", radius, " Radius pos: ", center_x, center_y
-    print "Initial pos: ", cur_x, cur_y, cur_z
+    #print "Radius: ", radius, " Radius pos: ", center_x, center_y
+    #print "Initial pos: ", cur_x, cur_y, cur_z
     angle_res=Angle(angle_res_factor*atan(res/radius)*360.0/(2.*pi))
-    print "Angle resolution: ", angle_res
+    #print "Angle resolution: ", angle_res
     start_angle=arc_point_to_angle(center_x, center_y, cur_x, cur_y)
     end_angle=arc_point_to_angle(center_x, center_y, x, y)
-    print "Start angle: ", start_angle
-    print "Stop angle: ", end_angle
+    #print "Start angle: ", start_angle
+    #print "Stop angle: ", end_angle
     angle_diff=end_angle-start_angle
-    print "Angle difference: ", angle_diff
+    #print "Angle difference: ", angle_diff
     angles=floor(angle_diff/angle_res.angle)+1
-    print "Angles: ", angles
+    #print "Angles: ", angles
     #get points in angle range
     z_step=(z-cur_z)/angles
-    print "Z step: ", z_step
+    #print "Z step: ", z_step
     inside=True
     angle=start_angle
     arc_points=[]
@@ -52,14 +52,14 @@ def gen_arc(cur_x, cur_y, cur_z, x, y ,z, i, j, res, speed, angle_res_factor=1.0
         if cw:
             angle-=angle_res
             if not angle.between(end_angle, start_angle):
-                print "angle outside, finishing"
+                #print "angle outside, finishing"
                 break
         else:
             angle+=angle_res
             if not angle.between(start_angle, end_angle):
-                print "angle outside, finishing"
+                #print "angle outside, finishing"
                 break
-        print "Current angle: ", angle
+        #print "Current angle: ", angle
 
         old_arc_x=arc_x
         old_arc_y=arc_y
@@ -74,15 +74,15 @@ def gen_arc(cur_x, cur_y, cur_z, x, y ,z, i, j, res, speed, angle_res_factor=1.0
         speedy=float(speed)*abs((arc_y-old_arc_y)/d)
         speedz=float(speed)*abs((arc_z-old_arc_z)/d)
 
-        print "Next pos: ", arc_x, arc_y, arc_z, speedx, speedy, speedz
+        #print "Next pos: ", arc_x, arc_y, arc_z, speedx, speedy, speedz
         arc_points.append([arc_x,arc_y,arc_z, speedx, speedy, speedz])
     d=sqrt((x-arc_x)**2+(y-arc_y)**2+(z-arc_z)**2)
     speedx=float(speed)*abs((x-arc_x)/d)
     speedy=float(speed)*abs((y-arc_y)/d)
     speedz=float(speed)*abs((z-arc_z)/d)
     arc_points.append([x, y, z, speedx, speedy, speedz])
-    print "Last pos: ", x, y , z, speedx, speedy, speedz
-    print "Arc points: ", len(arc_points)
+    #print "Last pos: ", x, y , z, speedx, speedy, speedz
+    #print "Arc points: ", len(arc_points)
     return(arc_points)
 
 
@@ -95,10 +95,26 @@ class Axis:
         self.res=(self.stepper.step/360.)*self.pitch
         self.last_move_right=True
         self.changed_dir=False
-        self.cur_pos=0.0
+        self.cur_pos=self.backlash/2.0
         self.cur_head_pos=self.cur_pos-self.backlash/2.0
+        self.set_to(self.cur_head_pos)
         self.last_head_pos_before_change_dir=self.cur_head_pos
-        self.stepper.move_angle2(360.0*(self.cur_pos)/self.pitch, 0.001/self.pitch)
+        #self.stepper.move_angle2(360.0*(self.cur_pos)/self.pitch, 0.001/self.pitch)
+
+    def park(self, right=True):
+        self.cur_pos=(self.stepper.cur_angle/360.0)*self.pitch
+        print "Motor os before parking; ", self.cur_pos
+        if right:
+            self.stepper.move_angle2(360.0*(self.cur_pos+self.backlash)/self.pitch, 0.010/self.pitch)
+            self.last_move_right=True
+            self.cur_pos=(self.stepper.cur_angle/360.0)*self.pitch
+            self.cur_head_pos=self.cur_pos-self.backlash/2.0
+        else:
+            self.stepper.move_angle2(360.0*(self.cur_pos-self.backlash)/self.pitch, 0.010/self.pitch)
+            self.last_move_right=False
+            self.cur_pos=(self.stepper.cur_angle/360.0)*self.pitch
+            self.cur_head_pos=self.cur_pos+self.backlash/2.0
+        self.last_head_pos_before_change_dir=self.cur_head_pos
 
     def disable(self):
         self.stepper.disable()
@@ -143,13 +159,14 @@ class Axis:
             return()
         if self.last_move_right:
             if (pos-self.cur_head_pos)>0.0:
-                print "Still moving right"
+                #print "Still moving right"
                 offset=self.backlash/2.0
             elif (pos-self.cur_head_pos)<0.0:
                 print "Changing direction from right to left"
                 offset=-self.backlash/2.0
                 self.last_move_right=False
                 self.changed_dir=True
+                self.stepper.backlash_speed=20.0
                 self.last_head_pos_before_change_dir=self.cur_head_pos
                 print "Last head pos: ", self.cur_head_pos
             else:
@@ -157,13 +174,14 @@ class Axis:
                 return()
         else:
             if (pos-self.cur_head_pos)<0.0:
-                print "Still moving left"
+                #print "Still moving left"
                 offset=-self.backlash/2.0
             elif (pos-self.cur_head_pos)>0.0:
                 print "Changing direction from left to right"
                 offset=self.backlash/2.0
                 self.last_move_right=True
                 self.changed_dir=True
+                self.stepper.backlash_speed=20.0
                 self.last_head_pos_before_change_dir=self.cur_head_pos
                 print "Last head pos: ", self.cur_head_pos
             else:
@@ -173,7 +191,11 @@ class Axis:
         self.stepper.move_angle2(360.0*(pos+offset)/self.pitch, speed/self.pitch)
 
     def set_to(self, pos):
-        self.stepper.set_to(360.0*pos/self.pitch)
+        if self.last_move_right:
+            offset=self.backlash/2.0
+        else:
+            offset=-self.backlash/2.0
+        self.stepper.set_to(360.0*(pos+offset)/self.pitch)
 
     def update(self):
         self.cur_pos=(self.stepper.cur_angle/360.0)*self.pitch
@@ -184,6 +206,7 @@ class Axis:
             else:
                 print "Out of backlash area", self.cur_pos-self.last_head_pos_before_change_dir, self.cur_pos, self.last_head_pos_before_change_dir
                 self.changed_dir=False
+                self.stepper.backlash_speed=1.0
         if not self.changed_dir:
             if self.last_move_right:
                 self.cur_head_pos=self.cur_pos-self.backlash/2.0
@@ -276,6 +299,7 @@ class Stepper_sim:
         self.cur_steps=0
         self.cur_dir=False
         self.last_vis_angle=0.0
+        self.backlash_speed=1.0
 
     def reset_pos(self):
         self.cur_angle=0.0
@@ -381,7 +405,7 @@ class Stepper_sim:
         if self.period==0.0:
             pass
         else:
-          if (new_time-self.time_last_toggle)>=(self.period/speed_scale):
+          if (new_time-self.time_last_toggle)>=(self.period/(speed_scale*self.backlash_speed)):
             #print "*****Time to toggle! ", new_time-self.time_last_toggle
             self.time_last_toggle=new_time
             #print "Steps left: ", self.steps
@@ -392,12 +416,12 @@ class Stepper_sim:
                 if delta_angle>0:
                     if self.cur_dir==True:
                         self.cur_dir=False
-                        sleep(0.001)
+                        sleep(0.00001)
                     self.cur_angle+=self.step
                 else:
                     if self.cur_dir==False:
                         self.cur_dir=True
-                        sleep(0.001)
+                        sleep(0.00001)
                     self.cur_angle-=self.step
                 #print "Cur angle: ", self.cur_angle
                 if abs(self.cur_angle-self.last_vis_angle)>10.0:
@@ -464,6 +488,7 @@ class Stepper:
         self.cur_angle=0.0
         self.cur_steps=0
         self.cur_dir=False
+        self.backlash_speed=1.0
 
     def reset_pos(self):
         self.cur_angle=0.0
@@ -573,7 +598,7 @@ class Stepper:
         if self.period==0.0:
           self.pulse.off()
         else:
-          if (new_time-self.time_last_toggle)>=(self.period/speed_scale):
+          if (new_time-self.time_last_toggle)>=(self.period/(speed_scale*self.backlash_speed)):
             #print "*****Time to toggle! ", new_time-self.time_last_toggle
             self.time_last_toggle=new_time
             #print "Steps left: ", self.steps
@@ -585,13 +610,13 @@ class Stepper:
                     if self.cur_dir==True:
                         self.direction.off()
                         self.cur_dir=False
-                        sleep(0.001)
+                        sleep(0.00001)
                     self.cur_angle+=self.step
                 else:
                     if self.cur_dir==False:
                         self.direction.on()
                         self.cur_dir=True
-                        sleep(0.001)
+                        sleep(0.00001)
                     self.cur_angle-=self.step
                 self.pulse.on()
                 self.pulse.off()
@@ -641,9 +666,9 @@ if __name__=="__main__":
       moty=Stepper(17, 27, 22, step=0.225)
       motz=Stepper(10, 9, 11, step=0.1125) # half the step of the others because of the belt reduction factor
   #motz=Stepper(10, 9, 11)
-  axisx=Axis(motx, backlash=0.0002)
-  axisy=Axis(moty, backlash=0.0002)
-  axisz=Axis(motz, backlash=0.0002)
+  axisx=Axis(motx, backlash=0.00027)
+  axisy=Axis(moty, backlash=0.00028)
+  axisz=Axis(motz, backlash=0.00047)
   axisx.enable()
   axisy.enable()
   axisz.enable()
@@ -653,7 +678,7 @@ if __name__=="__main__":
   while True:
     if len(move_buffer)>0:
         if not ((motx.isBusy2()) or (moty.isBusy2()) or (motz.isBusy2())):
-            print "Executing new move buffer cmd"
+            #print "Executing new move buffer cmd"
             ax, ay, az, speedx, speedy, speedz = move_buffer.pop(0)
             axisx.move_abs2(ax, speed=speedx)
             axisy.move_abs2(ay, speed=speedy)
@@ -768,7 +793,7 @@ if __name__=="__main__":
               if d>0.0:
                   arc_cmd_list=gen_arc(axisx.cur_head_pos, axisy.cur_head_pos, axisz.cur_head_pos, x, y , z, i_arc, j_arc, axisx.res, speed, angle_res_factor, cw=cw)
                   move_buffer+=arc_cmd_list
-                  print "Buffer updated", move_buffer
+                  #print "Buffer updated", move_buffer
                   # for ax,ay,az,speedx,speedy,speedz in arc_cmd_list:
                   #     print "Arc point: ", ax, ay, az
                   #     #raw_input()
@@ -826,11 +851,15 @@ if __name__=="__main__":
         pos_bottle.addDouble(axisy.cur_head_pos/0.0254)
         pos_bottle.addDouble(axisz.cur_head_pos/0.0254)
         pos_port.writeStrict()
+      elif data[0]=="park":
+        axisx.park()
+        axisy.park()
+        axisz.park()
       elif data[0]=="reset_pos":
         print "Resetting position!"
-        motx.reset_pos()
-        moty.reset_pos()
-        motz.reset_pos()
+        axisx.set_to(0.0)
+        axisy.set_to(0.0)
+        axisz.set_to(0.0)
       elif data[0]=="reset_z":
           print "input data: ", data
           z=float(data[1])
