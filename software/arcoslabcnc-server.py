@@ -486,7 +486,7 @@ class Stepper:
     def disable(self):
         self._enable=False
         self.ena.off()
-        self.direction.off()
+        #self.direction.off()
         #self.pulse.off()
 
     def stop(self):
