@@ -279,7 +279,7 @@ for i, line in enumerate(lines):
                     busy=False
                 else:
                     busy=True
-            yarp.Time.delay(0.1)
+            yarp.Time.delay(0.001)
         print "Last command finished"
         output_bottle=output_port.prepare()
         output_bottle.clear()
@@ -304,7 +304,7 @@ for i, line in enumerate(lines):
         output_port.writeStrict()
         while output_port.isWriting():
             print "Still writing"
-            yarp.Time.delay(0.1)
+            yarp.Time.delay(0.001)
 
 output_port.close()
 
