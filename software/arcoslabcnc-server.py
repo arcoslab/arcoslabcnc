@@ -666,9 +666,9 @@ if __name__=="__main__":
       moty=Stepper(17, 27, 22, step=0.225)
       motz=Stepper(10, 9, 11, step=0.1125) # half the step of the others because of the belt reduction factor
   #motz=Stepper(10, 9, 11)
-  axisx=Axis(motx, backlash=0.00027)
-  axisy=Axis(moty, backlash=0.00028)
-  axisz=Axis(motz, backlash=0.00047)
+  axisx=Axis(motx, backlash=0.000055) # 0.000095
+  axisy=Axis(moty, backlash=0.00025) # 0.00015
+  axisz=Axis(motz, backlash=0.00010) # 0.00014
   axisx.enable()
   axisy.enable()
   axisz.enable()
@@ -720,18 +720,42 @@ if __name__=="__main__":
       #print "Data: ", data
       if data[0]=="speed":
           print "Speed command: ", float(data[1]), float(data[2]), float(data[3])
+          motx.update2()
+          moty.update2()
+          motz.update2()
+          axisx.update()
+          axisy.update()
+          axisz.update()
+          axisx.move2(0.0, speed=0.003)
+          axisy.move2(0.0, speed=0.003)
+          axisz.move2(0.0, speed=0.003)
+          motx.update2()
+          moty.update2()
+          motz.update2()
+          axisx.update()
+          axisy.update()
+          axisz.update()
           if float(data[1])<0.:
               axisx.move2(-0.01, speed=-float(data[1]))
-          else:
+          elif float(data[1])>0.:
               axisx.move2(0.01, speed=float(data[1]))
+          else:
+              axisx.move2(0.0, speed=0.001)
           if float(data[2])<0.:
               axisy.move2(-0.01, speed=-float(data[2]))
-          else:
+          elif float(data[2])>0.:
               axisy.move2(0.01, speed=float(data[2]))
+          else:
+              axisy.move2(0.0, speed=0.001)
           if float(data[3])<0.:
               axisz.move2(-0.01, speed=-float(data[3]))
-          else:
+          elif float(data[3])>0.:
               axisz.move2(0.01, speed=float(data[3]))
+          else:
+              axisz.move2(0.0, speed=0.001)
+          axisx.update()
+          axisy.update()
+          axisz.update()
       elif data[0]=="move":
           if (not buffer_moving) and (not motx.isBusy2()) and (not moty.isBusy2()) and (not motz.isBusy2()):
               dx=float(data[1])
