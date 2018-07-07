@@ -71,12 +71,12 @@ y=0.0
 z=0.0
 exec_motion=False
 
-print "Resetting position to 0 to current position"
-output_bottle=output_port.prepare()
-output_bottle.clear()
-output_bottle.addString("reset_pos")
-output_port.writeStrict()
-sleep(1)
+# print "Resetting position to 0 to current position"
+# output_bottle=output_port.prepare()
+# output_bottle.clear()
+# output_bottle.addString("reset_pos")
+# output_port.writeStrict()
+# sleep(1)
 
 system_factor=0.001
 
@@ -265,12 +265,12 @@ for i, line in enumerate(lines):
         while busy:
             #print "Waiting for last command to finish"
             while status_port.getPendingReads()>0:
-                #print "Reading old status data"
-                status_port.read(True)
+                print "Reading old status data"
+                status_port.read(False)
             output_bottle=output_port.prepare()
             output_bottle.clear()
             output_bottle.addString("status")
-            output_port.write()
+            output_port.writeStrict()
             output_port.prepare()
             status_bottle=status_port.read(True)
             if status_bottle:
